@@ -1,0 +1,8 @@
+# ~4.8M params excluding embeddings. ABC main size.
+n_layers: 6
+d_model: 256
+n_heads: 8
+n_kv_heads: 8
+ffn_hidden: 704
+dropout: 0.0
+tie_embeddings: true

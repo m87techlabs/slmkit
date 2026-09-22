@@ -1,0 +1,10 @@
+# nanoGPT reference dimensions, for the M1 correctness run (DESIGN 5.0).
+# Matches nanoGPT's char-Shakespeare shape so the loss is comparable.
+# ~10.6M params excluding embeddings.
+n_layers: 6
+d_model: 384
+n_heads: 6
+n_kv_heads: 6
+ffn_hidden: 1024
+dropout: 0.2
+tie_embeddings: true

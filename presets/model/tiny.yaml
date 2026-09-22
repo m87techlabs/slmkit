@@ -1,0 +1,8 @@
+# ~25.7M params excluding embeddings. Chess.
+n_layers: 8
+d_model: 512
+n_heads: 8
+n_kv_heads: 8
+ffn_hidden: 1408
+dropout: 0.0
+tie_embeddings: true

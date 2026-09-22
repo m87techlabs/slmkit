@@ -1,0 +1,8 @@
+# ~303.6M params excluding embeddings. Late-stage, chess only. ~100-110 GPU-hours at 7B tokens.
+n_layers: 24
+d_model: 1024
+n_heads: 16
+n_kv_heads: 16
+ffn_hidden: 2752
+dropout: 0.0
+tie_embeddings: true

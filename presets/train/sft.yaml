@@ -1,0 +1,7 @@
+# Inherits default.yaml semantics; only the differences belong here.
+# Loss is masked on prompt tokens -- see the SFT mask unit test.
+lr: 3.0e-4
+warmup_tokens: 100_000
+epochs: 3
+batch_size: 32
+ckpt_every_minutes: 20
