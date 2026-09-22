@@ -31,6 +31,7 @@ abc_music = ["music21>=9.1"]
 chess     = ["python-chess>=1.10"]
 export    = ["transformers>=4.44"]   # HF export parity tests only
 wandb     = ["wandb>=0.17"]
+optim8bit = ["bitsandbytes>=0.45.3"]   # 8-bit Adam; verified on sm_120, see ADR 0001
 dev       = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11"]
 
 [project.scripts]
@@ -61,6 +62,12 @@ target-version = "py312"
 python_version = "3.12"
 strict = true
 files = ["src/slmkit"]
+
+# Optional, untyped third-party optimizer. Kept out of strict checking rather
+# than dropped, because it is exercised by `slm doctor` on real hardware.
+[[tool.mypy.overrides]]
+module = ["bitsandbytes.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 markers = ["gpu: requires a CUDA device (deselect with -m 'not gpu')"]
