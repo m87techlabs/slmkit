@@ -1,0 +1,22 @@
+# Start every new project at the `nano` preset -- prove the pipeline before spending GPU-hours.
+run:
+  name: <name>-baseline
+  seed: 1337
+  tracker: tensorboard
+project:
+  name: <name>
+  args: {}
+tokenizer:
+  type: char
+data:
+  block_size: 256
+  val_fraction: 0.05
+model:
+  preset: nano
+train:
+  preset: default
+  max_tokens: 10_000_000
+eval:
+  num_samples: 200
+  seeds: [0, 1, 2]
+  temperature: 0.8
