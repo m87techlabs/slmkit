@@ -11,7 +11,7 @@ until its pages exist — the documentation is part of the deliverable, not a fo
 
 | Page | Milestone | Covers |
 |---|---|---|
-| `environment.md` | M0 | Why WSL, why these versions, what `slm doctor` protects against |
+| [`environment.md`](environment.md) | M0 ☑ | Why WSL, how the GPU reaches Linux, why `sm_120` matters, storage, reading the benchmark |
 | `tokenization.md` | M1 | Turning text into tokens, and why the choice matters |
 | `the-model.md` | M1 | What a decoder-only transformer does, walked through this repo's code |
 | `the-training-loop.md` | M1 | Loss, learning-rate schedules, warmup, and what the guards catch |

@@ -42,13 +42,23 @@ at M0 (see `docs/ROADMAP.md`) and use your own.
 tier down one preset; 24 GB makes the 350M tier comfortable rather than aspirational. The
 compute budget, not the memory budget, is what actually limits you.
 
-### Peak compute (derived from the spec sheet, not measured)
+### Compute ceiling (measured — see ADR 0001)
 
-- BF16 tensor, FP32 accumulate, dense: **~112 TFLOPS**. GeForce cards run FP32-accumulate at
-  half the FP16-accumulate rate, and PyTorch matmuls use FP32 accumulate.
-- Realistic effective throughput at ~35% MFU: **~40 TFLOPS**.
-- **Always measure tokens/sec in the first 10 minutes of a run and recompute the estimate.**
-  Never plan from these numbers alone.
+`slm doctor --bench` on the reference machine reports **121.6 TFLOPS** for bf16 matrix multiply
+at 8192×8192. The spec-sheet derivation predicted ~112 TFLOPS, so the estimate was sound and
+slightly conservative.
+
+Two numbers, often confused:
+
+- **121.6 TFLOPS is a ceiling**, measured on nothing but large dense matmuls. It is the best the
+  hardware will ever do.
+- **~43 TFLOPS is the planning figure** — roughly 35% of the ceiling. Training is not pure
+  matmul: attention, normalization, the optimizer step and data movement all consume time the
+  benchmark never spends. That ratio is **MFU**, and it falls further on small models whose
+  matrices are too small to keep the tensor cores busy (see §6.6).
+
+**Always measure tokens/sec in the first 10 minutes of a run and recompute the estimate from
+that.** Even a measured ceiling is not a prediction of your particular model's throughput.
 
 ---
 
@@ -56,13 +66,13 @@ compute budget, not the memory budget, is what actually limits you.
 
 Rule of thumb: training FLOPs ≈ `6 × params × tokens` (+10–15% for attention at 1K context).
 
-| Run | FLOPs | Est. **GPU-hours** @ 40 TFLOPS | Verdict |
+| Run | FLOPs | Est. **GPU-hours** @ 43 TFLOPS | Verdict |
 |---|---|---|---|
 | 1–5M × 20–50M tokens (ABC) | ~1e15 | minutes | Main iteration loop |
-| 25–50M × 1–3B tokens (chess) | ~1e18 | 6–24 h | Scaling-lab tier |
-| 124M × 3B | 2.2e18 | **~16–18 h** | Feasible across a few sessions |
-| 350M × 7B | 1.5e19 | **~100–110 h** | Chess only; late, and deliberately |
-| 1B × 20B | 1.2e20 | ~840 h | **Out of scope** |
+| 25–50M × 1–3B tokens (chess) | ~1e18 | 6–20 h | Scaling-lab tier |
+| 124M × 3B | 2.2e18 | **~14–16 h** | Feasible across a few sessions |
+| 350M × 7B | 1.5e19 | **~95–105 h** | Chess only; late, and deliberately |
+| 1B × 20B | 1.2e20 | ~775 h | **Out of scope** |
 
 **Budget in GPU-hours, never in wall-clock dates.** The machine sleeps, so a "4-day run" is
 really ~100 GPU-hours spread over however many evenings it takes. Every ETA the trainer prints
@@ -164,13 +174,16 @@ so:
 Measured on the reference machine; your absolute numbers will differ, but the *ratio* is the
 point and it holds broadly.
 
-| Path | 512 MB write | 4K random read |
-|---|---|---|
-| ext4 (WSL VHDX) | 4.9 GB/s* | 1.8 GB/s (~440K IOPS) |
-| `/mnt/c` (9P) | 229 MB/s | 26 MB/s (~6.3K IOPS) |
+| Path | Sequential write | 4K random read | Method |
+|---|---|---|---|
+| ext4 (WSL VHDX) | **4,655 MB/s** | **631 MB/s (161K IOPS)** | `fio --direct=1`, qd16/qd32 |
+| `/mnt/c` (9P) | 229 MB/s | 26 MB/s (~6.3K IOPS) | `dd`, buffered |
 
-\*Probably page cache, since 512 MB fits in RAM. Re-measure at M0 with
-`fio --direct=1 --size=16G` for the real NVMe number.
+The ext4 figures bypass the page cache (`O_DIRECT`), so they are the real device. An earlier
+buffered `dd` reported 1.8 GB/s on 4K reads — that was RAM, not disk, and is a good illustration
+of why `--direct=1` matters when you benchmark storage.
+
+Even against the honest number, **ext4 random reads are ~24× faster than `/mnt/c`**.
 
 `/mnt/c` pays a per-operation cost because every file operation crosses the VM over 9P.
 Windows reading `\\wsl.localhost\...` pays the same cost in the other direction.

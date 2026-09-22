@@ -10,28 +10,27 @@ Status legend: ☐ not started · ◐ in progress · ☑ done
 
 ---
 
-## M0 — Environment ☐
+## M0 — Environment ☑
 
 Goal: a reproducible, verified ML environment in the `Ubuntu-ML` WSL distro.
 *~1–2 sessions, minutes of GPU.*
 
-- [ ] Create the distro: `wsl --install -d Ubuntu-24.04 --name Ubuntu-ML` (or export/import a
+- [x] Create the distro: `wsl --install -d Ubuntu-24.04 --name Ubuntu-ML` (or export/import a
       clean Ubuntu rootfs if your WSL version lacks `--name`).
+- [x] `scripts/setup-ml-distro.sh` — packages, `uv`, `$SLM_HOME`, cache env vars. Idempotent.
 - [ ] Update `.wslconfig` (DESIGN §3); `wsl --shutdown`; verify with `free -h`.
-- [ ] Install `uv`, git, build-essential, tmux, aria2, zstd, fio, abcmidi.
-- [ ] Set `SLM_HOME=~/slm` and the cache env vars in `~/.bashrc` (DESIGN §4).
-- [ ] Measure real disk throughput: `fio --direct=1 --size=16G` (sequential write, 4K random
-      read). Record in ADR 0001.
-- [ ] `uv sync`; confirm `sm_120` appears in `torch.cuda.get_arch_list()`.
-- [ ] Implement `slm doctor` (DESIGN §6.8).
-- [ ] Write `docs/concepts/environment.md`: why WSL, why these versions, what `doctor` checks
+      *Deferred: `wsl --shutdown` terminates every distro, so run it between sessions.*
+- [x] Measure real disk throughput with `fio --direct=1`. Recorded in ADR 0001.
+- [x] `uv sync`; confirm `sm_120` appears in `torch.cuda.get_arch_list()`.
+- [x] Implement `slm doctor` (DESIGN §6.8).
+- [x] Write `docs/concepts/environment.md`: why WSL, why these versions, what `doctor` checks
       and what each check protects against.
 
-**Exit criteria**
-- `slm doctor` all green (bitsandbytes may be a warning).
-- A bf16 matmul benchmark reports achieved TFLOPS. **Record it — this number replaces the
-  ~112 TFLOPS spec-sheet estimate in every later GPU-hour budget.**
-- ADR 0001 records torch, CUDA, driver, Triton, bitsandbytes and WSL versions.
+**Exit criteria — met**
+- [x] `slm doctor` all green, including an 8-bit Adam step (bitsandbytes 0.50.2 on `sm_120`).
+- [x] Achieved bf16: **121.6 TFLOPS**, against a ~112 spec-sheet estimate. Planning figure is
+      now ~43 TFLOPS (≈35% MFU); every GPU-hour budget in DESIGN §2 was updated.
+- [x] ADR 0001 records every version and measurement.
 
 ---
 

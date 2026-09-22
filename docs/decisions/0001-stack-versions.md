@@ -1,40 +1,70 @@
-# ADR 0001 — Stack versions
+# ADR 0001 — Stack versions and measured baselines
 
-**Status:** pending (fill in at M0)
+**Status:** accepted (M0 complete)
 
 ## Context
 
-Blackwell (`sm_120`) support is recent across the training stack. Pinning and recording exact
-versions is what makes a run reproducible after a months-long gap.
+Blackwell (`sm_120`) support is recent across the training stack, and every compute estimate in
+`docs/DESIGN.md` began as a spec-sheet derivation. Pinning exact versions and recording real
+measurements is what makes a run reproducible after a months-long gap — and what turns a budget
+from a guess into a number.
 
-## Decision
+## Versions
 
-Record at install time, and re-record whenever any of these change:
+| Component | Version |
+|---|---|
+| GPU | NVIDIA GeForce RTX 5080, 16 GB, `sm_120` |
+| NVIDIA driver (Windows) | 616.92 |
+| CUDA (user-mode, via WSL) | 13.4 |
+| WSL | 2.7.11.0 |
+| WSL kernel | 6.18.33.2-microsoft-standard-WSL2 |
+| Distro | Ubuntu 24.04 LTS (`Ubuntu-ML`) |
+| Python | 3.12 |
+| torch | **2.11.0+cu128** |
+| `torch.cuda.get_arch_list()` | `sm_75, sm_80, sm_86, sm_90, sm_100, **sm_120**` |
+| triton | 3.6.0 |
+| bitsandbytes | 0.50.2 |
 
-| Component | Version | Notes |
-|---|---|---|
-| NVIDIA driver (Windows) | | `nvidia-smi` |
-| CUDA (UMD, via WSL) | | |
-| WSL | | `wsl --version` |
-| Ubuntu | | |
-| Python | | |
-| torch | | must be a cu128+ wheel |
-| `torch.cuda.get_arch_list()` | | **must include `sm_120`** |
-| triton | | |
-| bitsandbytes | | 8-bit Adam optional; A/B before trusting |
-| numpy / pydantic / tokenizers | | see `uv.lock` |
+Exact resolved versions of everything else are in `uv.lock`.
 
-## Measured baselines (M0 exit criteria)
+## Measured baselines
 
 | Measurement | Value | Method |
 |---|---|---|
-| Achieved BF16 TFLOPS | | large matmul benchmark |
-| ext4 sequential write | | `fio --direct=1 --size=16G` |
-| ext4 4K random read | | `fio --direct=1 --size=16G` |
+| **Achieved bf16 matmul** | **121.6 TFLOPS** | `slm doctor --bench`, 8192×8192, fp32 accumulate |
+| Spec-sheet estimate it replaces | ~112 TFLOPS | derivation in DESIGN §1 |
+| Planning figure (≈35% MFU) | **~43 TFLOPS** | used for every GPU-hour budget in DESIGN §2 |
+| ext4 sequential write | 4,655 MB/s | `fio --direct=1 --bs=1M --iodepth=16` |
+| ext4 4K random read | 631 MB/s (161,592 IOPS) | `fio --direct=1 --bs=4k --iodepth=32` |
+| `/mnt/c` sequential write | 229 MB/s | `dd`, buffered |
+| `/mnt/c` 4K random read | 26 MB/s | `dd`, buffered |
+| VRAM visible to torch | 15.9 GiB | `slm doctor` |
+| RAM visible to the WSL VM | 11.7 GiB | `/proc/meminfo` |
 
-The achieved TFLOPS number replaces the ~112 TFLOPS spec-sheet estimate in every GPU-hour
-budget in DESIGN §2.
+## Decision
+
+Pin torch to a CUDA 12.8+ wheel index in `pyproject.toml` under `[tool.uv.sources]`, so the
+requirement is structural rather than a documentation note someone can miss. Treat
+`sm_120 in torch.cuda.get_arch_list()` as a hard `slm doctor` failure.
+
+Offer `bitsandbytes` as the optional `optim8bit` extra rather than a default dependency: 8-bit
+Adam halves optimizer memory but is not needed at the model sizes this project actually trains,
+and memory is not the binding constraint (DESIGN §2).
 
 ## Consequences
 
-Every ETA before M0 completes is a guess.
+- **8-bit Adam works on consumer Blackwell.** This was the single largest unknown in the plan;
+  `slm doctor` performs a real `AdamW8bit` step on the GPU and it passes. Still A/B it against
+  fp32 AdamW before trusting a long run — "it executes" is not "it converges the same".
+- The spec-sheet estimate was **9% conservative**, so the design's budgets needed only a mild
+  adjustment rather than a rethink. 350M × 7B moved from ~100–110 to ~95–105 GPU-hours.
+- The earlier buffered `dd` figure of 1.8 GB/s for 4K reads was page cache, not disk. The honest
+  `O_DIRECT` number is 631 MB/s — still ~24× faster than `/mnt/c`, which is what the rule in
+  DESIGN §4 rests on.
+- `torch` ships kernels for `sm_75` through `sm_120`, so the same lockfile works on hardware
+  from Turing onward.
+
+## Alternatives considered
+
+Letting `uv` resolve `torch` from PyPI's default index — rejected: the default wheel may lack
+`sm_120` kernels, and the failure appears at the first kernel launch rather than at install time.
