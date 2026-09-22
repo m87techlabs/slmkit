@@ -11,4 +11,3 @@ build/
 runs/
 *.bin
 *.safetensors
-CONTRIBUTING.md
