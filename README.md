@@ -72,3 +72,11 @@ uv run slm run shakespeare_char/ref
 
 Early. The scaffold and design are in place; the engine is being implemented milestone by
 milestone. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+## License
+
+Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+Apache-2.0 includes an express patent grant from contributors to users, and terminates that
+grant for anyone who brings a patent claim over the software. Contributions are accepted under
+the same terms.
