@@ -14,8 +14,10 @@ same pipeline:
 - This is a **learning project**: the model, trainer, sampler and SFT masking are hand-written
   on purpose.
 
-**Read before architectural work:** `docs/DESIGN.md` (architecture, contracts, rules) and
-`docs/ROADMAP.md` (current milestone and exit criteria). Work on the current milestone only.
+**Read before architectural work:** `docs/DESIGN.md` (architecture, contracts, rules),
+`docs/MODEL.md` (the model spec: architecture, presets, file formats; keep it in sync with
+`src/slmkit/model/` and `presets/model/`) and `docs/ROADMAP.md` (current milestone and exit
+criteria). Work on the current milestone only.
 
 ## Vocabulary
 

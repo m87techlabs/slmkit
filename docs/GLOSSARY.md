@@ -111,6 +111,27 @@ because the models are small enough not to need it.
 **Logits.** The raw, unnormalized scores the model outputs — one per vocabulary entry. Softmax
 turns them into probabilities.
 
+**Causal / autoregressive.** *Causal*: each position may only look at earlier positions, enforced
+by a mask. *Autoregressive*: generation feeds each output token back in as input for the next.
+Every model in slmkit is both. See [`MODEL.md`](MODEL.md) §1.
+
+**Residual connection.** A layer *adds* its output to its input (`x = x + f(x)`) instead of
+replacing it. It is what makes deep networks trainable at all.
+
+**Pre-norm.** Normalizing the *input* of each sub-layer rather than its output. More stable to
+train than the original transformer's post-norm.
+
+**`head_dim`.** Width of one attention head: `d_model / n_heads`. 64 in most presets.
+
+**SiLU.** A smooth activation function, `x · sigmoid(x)`, used as the gate inside SwiGLU.
+
+**KV cache.** During generation, the keys and values already computed for earlier tokens are
+kept, so each new token costs one step instead of re-running the whole prefix. GQA exists to
+shrink it.
+
+**MoE — Mixture of Experts.** An architecture where each token is routed to a few of many MLP
+"experts". It pays off at large scale; slmkit does not use it.
+
 ---
 
 ## Training

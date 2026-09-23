@@ -7,6 +7,7 @@ top to bottom in a terminal, comparing your output against the expected output o
 | Doc | Answers | Analogy |
 |---|---|---|
 | `../concepts/*.md` | Why does this work the way it does? | design doc |
+| `../MODEL.md` | What exactly is the model we build? | spec sheet |
 | `../STACK.md` | What is each tool, and why is it here? | bill of materials |
 | `../decisions/*.md` | What did we choose, and what did we reject? | ADR |
 | `runbooks/*.md` | Is it working on *my* machine, right now? | runbook / smoke test |
