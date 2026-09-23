@@ -33,6 +33,9 @@ CI, infrastructure-as-code — and **new to the ML training stack**. Write for t
 - Infrastructure analogies are welcome and encouraged: stages = Terraform modules, experiment
   YAML = tfvars, artifacts = immutable state.
 - Any abbreviation not in `docs/GLOSSARY.md` must be added there the first time it is used.
+- Any tool, library or service that enters the repo (dependency, system package, or something a
+  doc tells you to run) gets an entry in `docs/STACK.md` in the same change: what it is, why
+  slmkit uses it, what was rejected, and a link to its documentation.
 
 ## Documentation is a deliverable, not an afterthought
 

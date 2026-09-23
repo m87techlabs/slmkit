@@ -6,6 +6,8 @@ This is written for someone comfortable with software and infrastructure but **n
 learning**. Terms are grouped by what they belong to rather than alphabetically, because most of
 them only make sense next to their neighbours. If you want alphabetical, use your browser's find.
 
+For software and tools (PyTorch, CUDA, Triton, uv, …) see [`STACK.md`](STACK.md).
+
 ---
 
 ## The big picture

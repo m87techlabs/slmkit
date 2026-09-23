@@ -63,6 +63,7 @@ uv run slm run shakespeare_char/ref
 | | |
 |---|---|
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every abbreviation and term, in plain language |
+| [`docs/STACK.md`](docs/STACK.md) | Every tool and library: what it is, why it's used, what was rejected |
 | [`docs/concepts/`](docs/concepts/) | Explainers written as each stage is built |
 | [`docs/runbooks/`](docs/runbooks/) | Per-milestone: verify it yourself, expected output, and why |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Architecture, contracts, and the rules the code enforces |
