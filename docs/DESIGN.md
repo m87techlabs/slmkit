@@ -344,6 +344,7 @@ slmkit/
 │   │                         #        eval export serve run lineage runs
 │   ├── config/               # pydantic schemas, YAML load + preset merge + --set
 │   ├── artifacts.py          # hashing, manifests, atomic dir commit, /mnt guard
+│   ├── pipeline.py           # data stages: ingest prepare tokenize pack (idempotent)
 │   ├── registry.py           # @register_project discovery
 │   ├── project_api.py        # Project ABC, Doc, SFTExample, EvalPrompt, Grader
 │   ├── data/                 # group split, packing, memmap sampler, SFT collation

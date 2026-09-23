@@ -35,16 +35,16 @@ Goal: a reproducible, verified ML environment in the `Ubuntu-ML` WSL distro.
 
 ---
 
-## M1 — Engine + reference reproduction ☐
+## M1 — Engine + reference reproduction ◐
 
 Goal: prove the trainer is correct against a published result before trusting any novel project.
 *The longest stretch before anything interesting comes out — ~6–10 sessions, a few GPU-hours.*
 
-- [ ] `config/` — pydantic schemas, preset merge, `--set` overrides, resolved-config hashing.
-- [ ] `artifacts.py` — manifests, content-addressed IDs, atomic commit, `/mnt/` guard.
-- [ ] `registry.py` + `project_api.py` — minimal version, enough for one project.
-- [ ] `tokenizers/char.py`.
-- [ ] `data/` — group split, packing to `uint16` memmap, random-offset batch sampler.
+- [x] `config/` — pydantic schemas, preset merge, `--set` overrides, resolved-config hashing.
+- [x] `artifacts.py` — manifests, content-addressed IDs, atomic commit, `/mnt/` guard.
+- [x] `registry.py` + `project_api.py` — minimal version, enough for one project.
+- [x] `tokenizers/char.py`.
+- [x] `data/` — group split, packing to `uint16` memmap, random-offset batch sampler.
 - [ ] `model/llama.py` — RMSNorm, RoPE, SwiGLU, SDPA, tied embeddings, presets.
 - [ ] `train/` — trainer, AdamW, cosine+warmup in tokens, clipping, guards, full-state
       checkpoint/resume, throughput and GPU-hours-remaining logging.

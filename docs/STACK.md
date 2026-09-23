@@ -405,7 +405,9 @@ Markdown is excluded so that doc sketches keep their hand alignment.
 
 **Why strict.** ML code passes many shapes and dtypes around, and a type checker catches the
 `None`-where-a-tensor-was-expected class of bug before a GPU run does. Untyped third-party
-libraries (bitsandbytes) are exempted explicitly in `pyproject.toml`, not globally.
+libraries (bitsandbytes) are exempted explicitly in `pyproject.toml`, not globally. Libraries
+that ship without type information get a stub package instead (`types-PyYAML`, in the `dev`
+extra).
 
 ### pytest
 **●** `9.1` · [docs](https://docs.pytest.org/)

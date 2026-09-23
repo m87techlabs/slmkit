@@ -57,6 +57,10 @@ sequences get long. Good for small corpora.
 adjacent pair into a new token, so common strings become single tokens. This is what most
 general-purpose LLMs use.
 
+**Special tokens.** Reserved IDs that stand for no text. slmkit reserves `<unk>` (ID 0: a
+character the tokenizer never saw in training) and `<eos>` (ID 1: end of document) in every
+tokenizer. See [`concepts/tokenization.md`](concepts/tokenization.md) §3.
+
 **Fixed vocabulary.** A hand-specified token list for a domain with a known, finite symbol set —
 for example one token per legal chess move. Impossible for natural language, ideal when it
 applies.
@@ -406,6 +410,15 @@ manifests backwards with `slm lineage` to get from a model to its raw data.
 **ADR — Architecture Decision Record.** A short document in `docs/decisions/` capturing one
 decision: the context, what was chosen, the consequences, and what was rejected. It exists so
 that in six months nobody re-argues a settled question.
+
+**JSONL — JSON Lines.** A text file with one JSON object per line. slmkit's datasets store one
+document per line, so they can be streamed and inspected with `head` or `jq`.
+
+**Idempotent.** Running it twice has the same effect as running it once. Every `slm` stage is:
+a second run finds its artifact already built and skips it.
+
+**Salt.** A fixed extra value mixed into a hash so the same input hashes differently under a
+different salt. `data.split_seed` salts the train/val split.
 
 **`slm doctor`.** The environment check that must pass before any training command runs.
 
