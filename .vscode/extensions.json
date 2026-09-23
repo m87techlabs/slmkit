@@ -1,0 +1,20 @@
+{
+  // Extensions VS Code will offer to install when this folder is opened.
+  // VS Code installs extensions per remote, so a new WSL distro or a fresh
+  // clone starts with none -- this list is how that gets fixed in one click.
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "eamodio.gitlens"
+  ],
+  // Formatting is ruff's job (see `make lint`). A second formatter fighting it
+  // produces diffs that fail CI for reasons nobody can see in the editor.
+  "unwantedRecommendations": [
+    "esbenp.prettier-vscode",
+    "ms-python.black-formatter"
+  ]
+}
