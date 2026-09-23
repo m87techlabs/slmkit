@@ -31,7 +31,7 @@ Exact resolved versions of everything else are in `uv.lock`.
 
 | Measurement | Value | Method |
 |---|---|---|
-| **Achieved bf16 matmul** | **121.6 TFLOPS** | `slm doctor --bench`, 8192×8192, fp32 accumulate |
+| **Achieved bf16 matmul** | **121.6 TFLOPS** (re-runs: 111.7–114.3) | `slm doctor --bench`, 8192×8192, fp32 accumulate |
 | Spec-sheet estimate it replaces | ~112 TFLOPS | derivation in DESIGN §1 |
 | Planning figure (≈35% MFU) | **~43 TFLOPS** | used for every GPU-hour budget in DESIGN §2 |
 | ext4 sequential write | 4,655 MB/s | `fio --direct=1 --bs=1M --iodepth=16` |
@@ -39,7 +39,7 @@ Exact resolved versions of everything else are in `uv.lock`.
 | `/mnt/c` sequential write | 229 MB/s | `dd`, buffered |
 | `/mnt/c` 4K random read | 26 MB/s | `dd`, buffered |
 | VRAM visible to torch | 15.9 GiB | `slm doctor` |
-| RAM visible to the WSL VM | 11.7 GiB | `/proc/meminfo` |
+| RAM visible to the WSL VM | 11.7 GiB → **19.5 GiB** after `.wslconfig` `memory=20GB` | `/proc/meminfo` |
 
 ## Decision
 
@@ -58,6 +58,10 @@ and memory is not the binding constraint (DESIGN §2).
   fp32 AdamW before trusting a long run — "it executes" is not "it converges the same".
 - The spec-sheet estimate was **9% conservative**, so the design's budgets needed only a mild
   adjustment rather than a rethink. 350M × 7B moved from ~100–110 to ~95–105 GPU-hours.
+- Achieved TFLOPS varies by ~8% between sessions (111.7–121.6 measured) with GPU clocks,
+  temperature and background load. The planning figure is ~35% of that range, 40–43 TFLOPS;
+  budgets use 43, and the trainer replaces it with measured tokens/sec on every run anyway.
+  Re-measurement steps are in `docs/runbooks/m0-environment.md`.
 - The earlier buffered `dd` figure of 1.8 GB/s for 4K reads was page cache, not disk. The honest
   `O_DIRECT` number is 631 MB/s — still ~24× faster than `/mnt/c`, which is what the rule in
   DESIGN §4 rests on.

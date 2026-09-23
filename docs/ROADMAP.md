@@ -18,13 +18,14 @@ Goal: a reproducible, verified ML environment in the `Ubuntu-ML` WSL distro.
 - [x] Create the distro: `wsl --install -d Ubuntu-24.04 --name Ubuntu-ML` (or export/import a
       clean Ubuntu rootfs if your WSL version lacks `--name`).
 - [x] `scripts/setup-ml-distro.sh` — packages, `uv`, `$SLM_HOME`, cache env vars. Idempotent.
-- [ ] Update `.wslconfig` (DESIGN §3); `wsl --shutdown`; verify with `free -h`.
-      *Deferred: `wsl --shutdown` terminates every distro, so run it between sessions.*
+- [x] Update `.wslconfig` (DESIGN §3); `wsl --shutdown`; verify with `free -h` (19.5 GiB).
 - [x] Measure real disk throughput with `fio --direct=1`. Recorded in ADR 0001.
 - [x] `uv sync`; confirm `sm_120` appears in `torch.cuda.get_arch_list()`.
 - [x] Implement `slm doctor` (DESIGN §6.8).
 - [x] Write `docs/concepts/environment.md`: why WSL, why these versions, what `doctor` checks
       and what each check protects against.
+- [x] Write `docs/runbooks/m0-environment.md`: every M0 step with how to verify it by hand,
+      expected output, and why it was done that way.
 
 **Exit criteria — met**
 - [x] `slm doctor` all green, including an 8-bit Adam step (bitsandbytes 0.50.2 on `sm_120`).
@@ -57,6 +58,8 @@ Goal: prove the trainer is correct against a published result before trusting an
 - [ ] Write `docs/concepts/`: `tokenization.md`, `the-model.md` (what a decoder-only
       transformer does, walked through slmkit's own code), `the-training-loop.md` (loss, LR
       schedule, why warmup, what the guards catch).
+- [ ] Write `docs/runbooks/m1-engine.md`: how to verify each M1 piece by hand (run the
+      reference, watch loss and samples, kill and resume a run), with expected output and why.
 
 **Exit criteria**
 - `slm run shakespeare_char/ref` reaches val loss **≤ 1.55 with a loss curve shaped like
@@ -86,6 +89,7 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 - [ ] `serve/app.py` (FastAPI `/generate`).
 - [ ] `export --to-windows` for MIDI (abc2midi) so you can listen on Windows.
 - [ ] Sweep nano vs micro, char vs BPE, with and without augmentation (3 seeds each).
+- [ ] Write `docs/runbooks/m2-abc-music.md` (verify by hand: ingest, splits, graders, listen to output).
 - [ ] Write `docs/concepts/`: `sft.md` (why loss masking, how base and instruct models differ)
       and `evaluation.md` (why programmatic graders, why ≥3 seeds, what a baseline is for).
 

@@ -41,6 +41,10 @@ able to follow it without prior ML knowledge.
 
 - **Every milestone ships its explainer.** When you implement a stage, write the `docs/concepts/`
   page explaining what it does and why it works that way — in the same change, not later.
+- **Every milestone ships its runbook** in `docs/runbooks/mN-<name>.md`: for each piece built,
+  *what* it is, *how* it was done, *how to verify it by hand* (commands plus real expected
+  output captured by running them), and *why* it was done that way, including what was
+  rejected. Update it whenever a verification step changes.
 - Explain the *why*, not the *what*. `docs/concepts/` is for understanding; docstrings are for
   interface.
 - Prefer a worked example with real numbers over an abstract description.

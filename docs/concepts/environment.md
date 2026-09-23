@@ -1,6 +1,7 @@
 # The environment
 
-*Milestone M0. Read `../GLOSSARY.md` for any unfamiliar term.*
+*Milestone M0. Read `../GLOSSARY.md` for any unfamiliar term. To check each piece on your own
+machine, follow `../runbooks/m0-environment.md`.*
 
 Before any of the interesting work, you need a machine that can actually train. This page
 explains what we set up, why each piece is there, and what breaks without it.
@@ -153,7 +154,8 @@ It writes everything it learns to `$SLM_HOME/doctor.json`, which is what populat
 `slm doctor --bench` multiplies two 8192×8192 bf16 matrices repeatedly and divides total
 floating-point operations by elapsed time. A matmul of two N×N matrices costs `2 × N³` operations.
 
-On the reference machine: **121.6 TFLOPS**.
+On the reference machine: **121.6 TFLOPS**, and 112–114 on later sessions. Consumer cards adjust
+their clocks to temperature and power, so expect a spread of several percent between runs.
 
 That number is a **ceiling, not a throughput prediction**, and confusing the two will make every
 estimate you produce roughly three times too optimistic.

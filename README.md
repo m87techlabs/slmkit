@@ -64,6 +64,7 @@ uv run slm run shakespeare_char/ref
 |---|---|
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every abbreviation and term, in plain language |
 | [`docs/concepts/`](docs/concepts/) | Explainers written as each stage is built |
+| [`docs/runbooks/`](docs/runbooks/) | Per-milestone: verify it yourself, expected output, and why |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Architecture, contracts, and the rules the code enforces |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Milestones and their exit criteria |
 | [`docs/decisions/`](docs/decisions/) | ADRs — what was decided, and what was rejected |

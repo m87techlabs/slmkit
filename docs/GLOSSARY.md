@@ -389,6 +389,17 @@ that in six months nobody re-argues a settled question.
 **`$SLM_HOME`.** The directory holding all data, artifacts, runs and caches. Deliberately outside
 the repo, on a fast Linux filesystem.
 
+**IOPS — I/O Operations Per Second.** How many separate reads or writes a disk completes per
+second. For many small files this matters more than MB/s.
+
+**Page cache.** RAM that Linux uses to hold recently read or written file data. A benchmark that
+reads a file it has just written measures this cache, not the disk.
+
+**`O_DIRECT`.** A flag that makes file I/O bypass the page cache, so a benchmark measures the
+disk itself. It is what `fio --direct=1` sets.
+
+**Runbook.** A page in `docs/runbooks/` you run top to bottom to check a milestone by hand.
+
 **GPU-hours.** How slmkit budgets compute. Not wall-clock time, because the workstation is
 assumed to be off for long stretches and a "four-day run" is really a hundred GPU-hours spread
 over however many sessions it takes.
