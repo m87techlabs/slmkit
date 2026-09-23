@@ -58,6 +58,11 @@ packages = ["src/slmkit"]
 line-length = 100
 target-version = "py312"
 
+# Ruff formats Python code blocks inside Markdown by default. The ones in docs/
+# are illustrative sketches with hand-aligned comments, not code, so leave them.
+[tool.ruff.format]
+exclude = ["*.md"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
