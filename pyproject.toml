@@ -32,7 +32,7 @@ chess     = ["python-chess>=1.10"]
 export    = ["transformers>=4.44"]   # HF export parity tests only
 wandb     = ["wandb>=0.17"]
 optim8bit = ["bitsandbytes>=0.45.3"]   # 8-bit Adam; verified on sm_120, see ADR 0001
-dev       = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11"]
+dev       = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0"]
 
 [project.scripts]
 slm = "slmkit.cli:app"
@@ -67,6 +67,8 @@ exclude = ["*.md"]
 python_version = "3.12"
 strict = true
 files = ["src/slmkit"]
+# Teaches mypy pydantic's semantics (e.g. `Field(200, gt=0)` is a default, not a required arg).
+plugins = ["pydantic.mypy"]
 
 # Optional, untyped third-party optimizer. Kept out of strict checking rather
 # than dropped, because it is exercised by `slm doctor` on real hardware.
@@ -77,3 +79,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 markers = ["gpu: requires a CUDA device (deselect with -m 'not gpu')"]
 testpaths = ["tests", "projects"]
+# Every project has its own tests/test_project.py; importlib mode lets identical basenames
+# coexist instead of colliding in sys.modules.
+addopts = "--import-mode=importlib"

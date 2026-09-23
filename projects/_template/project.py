@@ -8,16 +8,19 @@ See docs/DESIGN.md 6.4 and the checklist in CONTRIBUTING.md.
 
 from __future__ import annotations
 
+# from pydantic import BaseModel, ConfigDict
 # from slmkit.project_api import Doc, EvalPrompt, Grader, Project, TokenizerSpec
 # from slmkit.registry import register_project
 
 
+# class TemplateArgs(BaseModel):
+#     model_config = ConfigDict(extra="forbid")   # typos in the YAML fail loudly
+#     ...                                          # everything under `project.args:`
+#
 # @register_project("<name>")
 # class TemplateProject(Project):
-#     name = "<name>"
-#
-#     class Args(BaseModel):
-#         ...
+#     Args = TemplateArgs
+#     data_version = 1                        # bump when documents()/augment() output changes
 #
 #     def ingest(self, raw_dir): ...          # idempotent download
 #     def documents(self, raw_dir): ...       # yield Doc(group=<leakage-free key>)
@@ -25,3 +28,6 @@ from __future__ import annotations
 #     def eval_prompts(self, split): ...
 #     def graders(self): ...                  # domain graders only; generic ones come
 #                                             # from slmkit.graders
+#
+#     Optional: augment (train split only), split_exclusions, sft_examples, logits_processor.
+#     See projects/shakespeare_char/project.py for a complete, small example.

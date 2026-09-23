@@ -1,0 +1,33 @@
+# The M1 reference run: nanoGPT's `train_shakespeare_char.py` settings, expressed in tokens.
+# Pass mark: val loss <= 1.55 with a curve shaped like nanoGPT's (DESIGN 5.0).
+run:
+  name: shakespeare-ref
+  seed: 1337
+  tracker: tensorboard
+project:
+  name: shakespeare_char
+  args:
+    block_chars: 10000
+tokenizer:
+  type: char
+data:
+  block_size: 256
+  val_fraction: 0.1         # nanoGPT holds out 10%
+  append_eos: false         # one continuous text; blocks are not independent documents
+model:
+  preset: ref               # 6L / 384d / 6h, dropout 0.2 -- nanoGPT's dimensions
+train:
+  preset: default
+  max_tokens: 81_920_000    # 5,000 steps x 64 sequences x 256 tokens
+  batch_size: 64
+  lr: 1.0e-3
+  min_lr_ratio: 0.1         # nanoGPT decays to 1e-4
+  betas: [0.9, 0.99]        # beta2 0.99: few tokens per step, so average over fewer steps
+  warmup_tokens: 1_638_400  # 100 steps
+  eval_every_steps: 250
+  eval_iters: 200
+  compile: true
+eval:
+  num_samples: 8
+  seeds: [0]
+  temperature: 0.8
