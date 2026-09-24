@@ -34,6 +34,7 @@ Expected (reference machine):
   PASS  arch support             sm_120 in wheel
   PASS  bf16 matmul              works
   PASS  SDPA                     works
+  PASS  torch.compile            Triton kernel built and ran
   PASS  bitsandbytes             0.50.2, 8-bit Adam step OK
   PASS  SLM_HOME location        /home/<you>/slm (ext4)
   PASS  free space               945 GiB free
@@ -145,6 +146,7 @@ nothing, which is the same property you expect from an Ansible play.
 ```bash
 uv --version
 for t in git tmux fio zstd aria2c abc2midi jq; do printf '%-9s ' $t; command -v $t || echo MISSING; done
+ls /usr/include/python3.12/Python.h     # from python3-dev
 ```
 
 **Why each one is there:**
@@ -156,6 +158,7 @@ for t in git tmux fio zstd aria2c abc2midi jq; do printf '%-9s ' $t; command -v 
 | `fio` | honest disk benchmarks (§7) | M0 |
 | `zstd`, `aria2c` | download and stream-decompress large corpora without storing them twice | M2, M3 |
 | `abc2midi` | grading ABC music output, and turning it into audio you can listen to | M2 |
+| `build-essential`, `python3-dev` | `torch.compile` has Triton build a small C helper, which needs a C compiler and `Python.h` | M1+ |
 
 We chose `uv` over pip/venv/conda because it gives one tool, a lockfile, and fast, reproducible
 installs. **Never `pip install` into the system Python**, because that breaks the lockfile
@@ -254,6 +257,7 @@ mode and writes what it measured to `$SLM_HOME/doctor.json`.
 | `arch support` | device `sm_XY` ∈ `get_arch_list()` | §5: a crash at the first kernel launch |
 | `bf16 matmul` | a 512×512 bf16 matrix multiply on the GPU | bf16 is the precision slmkit trains in |
 | `SDPA` | one causal attention call | SDPA is slmkit's only attention path; if it fails, nothing trains |
+| `torch.compile` | compiles and runs one tiny function | the compile toolchain (Triton, gcc, `Python.h`) failing at the first training step. Added in M1, after `python3-dev` turned out to be missing |
 | `bitsandbytes` | one **real** `AdamW8bit` optimizer step | 8-bit Adam installed but unable to run on new hardware (WARN only, because it is optional) |
 | `SLM_HOME location` | refuses anything under `/mnt/` | §7: a 20–130× I/O slowdown you would blame on the GPU |
 | `free space` | warns below 50 GiB | a checkpoint write failing halfway through |
@@ -462,5 +466,6 @@ M0 also defines the routine that starts every session (full reasoning in
 | `arch support: FAIL` | torch came from the wrong index | check `[tool.uv.sources]`; `uv sync --reinstall-package torch` |
 | `SLM_HOME: not set` | `~/.profile` not loaded (e.g. a non-login shell) | `source ~/.profile` |
 | `bitsandbytes: WARN not installed` | extras not synced | `uv sync --all-extras` |
+| `torch.compile: FAIL … Python.h` | Python development headers missing | `sudo apt-get install python3-dev` (or re-run `scripts/setup-ml-distro.sh`) |
 | `swap: WARN` | other workloads are holding memory | stop containers; check `free -h` |
 | TFLOPS well below 110 | GPU busy, hot, power-limited, or on a laptop power plan | close GPU apps; check `nvidia-smi` power and temperature |

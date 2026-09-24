@@ -451,6 +451,7 @@ Installed by `scripts/setup-ml-distro.sh`.
 | `jq` | JSON processor for the shell | Reading manifests, `doctor.json` and Cricsheet JSON from the command line | [manual](https://jqlang.org/manual/) |
 | `curl` | HTTP client | Installing `uv`; poking `slm serve` | [docs](https://curl.se/docs/) |
 | `build-essential` | gcc, make, libc headers | Triton compiles a small C helper at runtime and needs a system C compiler | [package](https://packages.ubuntu.com/noble/build-essential) |
+| `python3-dev` | Python's C headers (`Python.h`) | The same Triton helper includes `Python.h`. Without it `torch.compile` fails at the first compile with `Python.h: No such file or directory`. Missed in M0 and caught by the M1 GPU tests; `slm doctor` now checks it | [package](https://packages.ubuntu.com/noble/python3-dev) |
 | `abc2midi` | Part of abcMIDI; converts ABC to MIDI | Grading ABC output and listening to it (M2) | [abcMIDI](https://abcmidi.sourceforge.io/) |
 
 ---

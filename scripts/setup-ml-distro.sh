@@ -28,10 +28,13 @@ say "Installing system packages"
 # abcmidi  -- abc2midi, for grading and listening to the ABC music project
 # tmux     -- long runs survive a disconnected terminal (not a power-off; that
 #             is what checkpoints are for)
+# python3-dev -- Python.h. torch.compile has Triton build a small C helper at
+#             runtime; without the headers it fails at the first compile, not
+#             at install time
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -qq
 sudo apt-get install -y -qq --no-install-recommends \
-    git build-essential tmux aria2 zstd fio curl ca-certificates abcmidi jq unzip
+    git build-essential python3-dev tmux aria2 zstd fio curl ca-certificates abcmidi jq unzip
 
 say "Installing uv"
 if ! command -v uv >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/uv" ]; then

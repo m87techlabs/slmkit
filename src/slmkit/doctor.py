@@ -142,7 +142,35 @@ def check_torch() -> list[Check]:
     except Exception as exc:  # noqa: BLE001
         out.append(Check("SDPA", Status.FAIL, str(exc)[:200]))
 
+    out.append(check_compile())
     return out
+
+
+def check_compile() -> Check:
+    """torch.compile end to end: trace, generate a Triton kernel, build it, run it.
+
+    Each step has its own dependency (Triton, a C compiler, Python's headers), and every one
+    of them is invisible until the first compile. Found the hard way: without `python3-dev`
+    this fails with `Python.h: No such file or directory` deep inside Inductor.
+    """
+    try:
+        import torch
+        import torch.nn.functional as F
+
+        fn = torch.compile(lambda x: F.silu(x) * x)
+        x = torch.randn(1024, device="cuda")
+        torch.testing.assert_close(fn(x), F.silu(x) * x)
+        return Check("torch.compile", Status.OK, "Triton kernel built and ran")
+    except Exception as exc:  # noqa: BLE001
+        text = str(exc)
+        # Inductor wraps the real failure in boilerplate; show the line that names it.
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        detail = next(
+            (ln for ln in lines if "error" in ln.lower() and "TORCHDYNAMO" not in ln),
+            lines[0] if lines else type(exc).__name__,
+        )
+        hint = " -- install python3-dev (scripts/setup-ml-distro.sh)" if "Python.h" in text else ""
+        return Check("torch.compile", Status.FAIL, detail[:160] + hint)
 
 
 def check_bitsandbytes() -> Check:

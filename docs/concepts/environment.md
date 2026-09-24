@@ -139,6 +139,7 @@ Each check exists because of a specific failure that costs real time:
 | `sm_120` in arch list | Wheel without kernels for your GPU — fails at first launch, not at install |
 | bf16 matmul | The precision the whole project trains in |
 | SDPA | slmkit's only attention implementation; broken means nothing trains |
+| `torch.compile` | Triton, a C compiler and Python's headers are all needed at the first compile, and none is checked at install time |
 | bitsandbytes step | 8-bit Adam present but non-functional on new hardware |
 | `$SLM_HOME` not under `/mnt/` | A 24× storage slowdown you would blame on the GPU |
 | Cache variables | Compiler caches quietly landing on a slow filesystem |

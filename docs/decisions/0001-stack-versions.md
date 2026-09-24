@@ -62,6 +62,9 @@ and memory is not the binding constraint (DESIGN §2).
   temperature and background load. The planning figure is ~35% of that range, 40–43 TFLOPS;
   budgets use 43, and the trainer replaces it with measured tokens/sec on every run anyway.
   Re-measurement steps are in `docs/runbooks/m0-environment.md`.
+- **Gap found in M1:** `torch.compile` needs `python3-dev` (for `Python.h`) as well as a C
+  compiler, and M0 never compiled anything, so the gap went unnoticed. The setup script now
+  installs it and `slm doctor` runs a real compile.
 - The earlier buffered `dd` figure of 1.8 GB/s for 4K reads was page cache, not disk. The honest
   `O_DIRECT` number is 631 MB/s — still ~24× faster than `/mnt/c`, which is what the rule in
   DESIGN §4 rests on.
