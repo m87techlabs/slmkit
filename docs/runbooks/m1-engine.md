@@ -10,8 +10,8 @@ result. It is split into four phases, each ending with this runbook checked by h
 | Phase | Builds | Status |
 |---|---|---|
 | **A** | Config, artifacts, Project API, char tokenizer, data pipeline | ☑ |
-| **B** | The model (`model/llama.py`) | ☑ this page |
-| C | Trainer, checkpoints/resume, sampling, tracking | ☐ |
+| **B** | The model (`model/llama.py`) | ☑ |
+| **C** | Trainer, checkpoints/resume, sampling, tracking | ☑ this page |
 | D | The reference run, kill-and-resume | ☐ |
 
 Run everything from the repo root in `Ubuntu-ML`. Expected output is from the reference machine;
@@ -637,3 +637,257 @@ CC=/bin/false TRITON_CACHE_DIR=/tmp/tc TORCHINDUCTOR_CACHE_DIR=/tmp/ic uv run sl
 - [x] HF parity: all keys match, max logit difference 0.0.
 - [x] Causality holds exactly; one batch is memorized.
 - [ ] **You** have run B.1–B.6 and the output matches.
+
+---
+
+# Phase C: the training loop
+
+*Concepts: [`../concepts/the-training-loop.md`](../concepts/the-training-loop.md). Code:
+[`src/slmkit/train/`](../../src/slmkit/train/), [`sampling/`](../../src/slmkit/sampling/),
+[`tracking/`](../../src/slmkit/tracking/).*
+
+**Use a scratch `$SLM_HOME` for this phase.** The run ID is a hash of the config and data, so a
+short test run of `shakespeare_char/ref` in `~/slm` *would be* the reference run, and Phase D
+would resume it instead of starting fresh. A scratch home keeps them apart. Copy `doctor.json`
+across so MFU uses your measured peak:
+
+```bash
+export SLM_HOME=/tmp/slm-c
+mkdir -p $SLM_HOME && cp ~/slm/doctor.json $SLM_HOME/
+```
+
+Every command in C.1–C.7 assumes that export. Open a new terminal (or `export SLM_HOME=~/slm`)
+to go back to your real home.
+
+## C.0 The checks
+
+```bash
+make test                                                  # 89 passed in ~7s
+uv run pytest -q tests/unit/test_trainer.py tests/unit/test_train_parts.py   # 17 passed
+make test-gpu                                              # 4 passed in ~20s
+```
+
+---
+
+## C.1 Watch it learn: 300 steps
+
+```bash
+uv run slm pretrain shakespeare_char/ref --max-steps 300 --set train.eval_every_steps=100
+```
+
+About 40 seconds, most of it `torch.compile` and evals. Abridged output:
+
+```
+shakespeare_char/ref:
+  raw       built   raw-b7c40ca6e54d  /tmp/slm-c/raw/shakespeare_char        ← same IDs as ~/slm:
+  dataset   built   ds-bdaf3875e330  …                                        content-addressed
+  tokenizer built   tk-e4687abe1801  …
+  packed    built   pk-41a610dc1eb1  …
+run run-a1d5f0a224ff  (shakespeare_char/ref, shakespeare-ref)
+  device      cuda  bf16=True  compile=True
+  parameters  10,647,552 (10,621,824 non-embedding + 25,728 embedding)
+  per step    16,384 tokens = 64 x 256
+  budget      81,920,000 tokens = 5.81e+15 FLOPs
+  remaining   81,920,000 tokens ~ 2.3 GPU-min (estimate at 43 TFLOPS)
+eval  step      0  train 4.3705  val 4.3694  (gap -0.0011)  * best  [3.8s]
+── sample @ step 0: ROMEO ─────────────
+ROMEO:
+Azz;BdL:klq&vJgYbkmB�Q:oHICrqqBo
+  measured    812,483 tokens/s  ·  57.7 TFLOPS  ·  MFU 51.4% of 112.1 (measured by slm doctor --bench)
+              memory 1.58 GiB peak  ·  remaining 1.7 GPU-min (measured)
+step     50  loss 2.4175  lr 5.00e-04  gnorm 0.63  812,483 tok/s    1.0%  remaining 1.7 GPU-min
+step    100  loss 1.9501  lr 1.00e-03  gnorm 0.60  809,816 tok/s    2.0%  remaining 1.6 GPU-min
+eval  step    100  train 1.8837  val 1.9035  (gap +0.0198)  * best  [2.6s]
+── sample @ step 100: ROMEO ─────────────
+ROMEO:
+As sorn kill'd the came, I rehesed the the lisine:
+Why, the carthou as the butly brooust sue surnead
+…
+eval  step    300  train 1.3924  val 1.4569  (gap +0.0644)  * best  [2.6s]
+── sample @ step 300: JULIET ─────────────
+JULIET:
+How diest not but which come, have together with the own.
+
+GREMIO:
+Perful, the Duke of York holds a company mind of Gloucester,
+  checkpoint  ckpt/step_0000300  (0.1s)
+stopped (session limit (300 steps)) at step 300, 6.0% done. Run the same command to resume.
+```
+
+**What to check, line by line:**
+
+| Line | Expect | Why it matters |
+|---|---|---|
+| `eval step 0` | train ≈ val ≈ 4.37, close to ln 67 = 4.20 | untrained model is guessing uniformly (Phase B, B.1) |
+| step 0 sample | random characters | the baseline everything is compared against |
+| `measured` | ~810K tokens/s, MFU ~51% | replaces the 43 TFLOPS estimate; `remaining` switches to "(measured)" |
+| `lr` | 5.00e-04 at step 50, 1.00e-03 at step 100 | warmup reaches peak exactly at 1,638,400 tokens (the-training-loop.md §3) |
+| `gnorm` | falling, ~0.4–0.6 | stable; a spike to 10+ would mean trouble |
+| evals | val 4.37 → 1.90 → 1.57 → 1.46 | learning; below the bigram baseline (2.45) by step 100 |
+| gap | small and growing (+0.02 → +0.06) | expected: the model is starting to fit the training text specifically |
+| samples | format by step 100, mostly real words by 300 | the number and the text agree |
+
+**Why samples, not just loss:** at step 300, validation loss already equals nanoGPT's *final*
+result. That looked too good, so it was checked for leakage before being trusted: the causal
+mask on the compiled GPU path, and shared text between splits. Both were clean (the-training-loop.md §2).
+The samples are what made the number believable.
+
+---
+
+## C.2 Resume: run the same command again
+
+```bash
+uv run slm pretrain shakespeare_char/ref --max-steps 100 --set train.eval_every_steps=100
+```
+```
+  RESUMING    from step_0000300 (6.0% done, saved 2026-09-24T09:39:57-05:00, 0.01 GPU-h so far)
+  remaining   77,004,800 tokens ~ 1.6 GPU-min (measured)
+step    350  loss 1.3979  lr 9.94e-04  gnorm 0.40  800,834 tok/s    7.0%  remaining 1.6 GPU-min
+step    400  loss 1.3707  lr 9.92e-04  gnorm 0.37  806,907 tok/s    8.0%  remaining 1.6 GPU-min
+eval  step    400  train 1.3189  val 1.3992  (gap +0.0803)  * best  [3.1s]
+  checkpoint  ckpt/step_0000400  (0.1s)
+```
+
+- No flag was needed: the same command found the same run directory and its checkpoint.
+- The loss picks up where it stopped (1.49 at step 300 → 1.40 at 350). There is no jump back
+  towards 4.2 and no warmup spike, because the optimizer state and lr schedule came back too.
+- `remaining` says "(measured)" straight away: the measured speed was saved in the checkpoint.
+- `--set train.eval_every_steps=100` did **not** start a new run. Eval cadence is an
+  *operational* setting, excluded from the run ID (`train/run.py::OPERATIONAL`). Try
+  `--set train.lr=6e-4` instead and you get a different run ID and a fresh start.
+
+**Why:** the machine is off most nights, so every real run is a resumed run. The exact proof
+is a test, `test_resume_is_equivalent_to_never_stopping`: 20 steps straight vs 10 + resume + 10
+give identical losses (difference 0.0 on the CPU).
+
+---
+
+## C.3 Ctrl-C: stopping is normal
+
+Start a run with no limit and press **Ctrl-C** once, after a few `step` lines:
+
+```bash
+uv run slm pretrain shakespeare_char/ref --set train.eval_every_steps=100000
+```
+Your step numbers depend on when you press it; this is from a real stop:
+
+```
+step   3350  loss 0.8089  lr 3.29e-04  gnorm 0.38  816,589 tok/s   67.0%  remaining 0.6 GPU-min
+^C
+SIGINT: finishing this step, then checkpointing. Press Ctrl-C again to abort without saving.
+  checkpoint  ckpt/step_0003387  (0.2s)
+stopped (SIGINT) at step 3387, 67.7% done. Run the same command to resume.
+```
+
+You may also see a `KeyboardInterrupt` traceback from `torch/_inductor/…/subprocess.py`. That
+is one of `torch.compile`'s worker processes, which shares the terminal's process group and
+received the same Ctrl-C. It is harmless. The trainer's own `checkpoint` and `stopped` lines are
+what count.
+
+**Why this needed a fix.** Under `uv run`, one Ctrl-C reaches the trainer **twice**: once from
+the terminal and once forwarded by `uv`. The first version treated the second arrival as "press
+again to abort" and threw the checkpoint away mid-write. A repeat within one second now counts
+as the same keypress (the-training-loop.md §7). A deliberate second press, later, still aborts
+without saving.
+
+---
+
+## C.4 Where are my runs?
+
+```bash
+uv run slm runs list
+```
+```
+RUN               NAME               TOKENS             DONE  GPU-h   LEFT BEST VAL  LAST CHECKPOINT        STATUS
+run-a1d5f0a224ff  shakespeare-ref    6.6M/81.9M         8.0%   0.01   0.03   1.3992  step 400 · just now    stopped: session limit (100 steps)
+```
+
+After two weeks away, this table is how you remember where you were: how far each run got,
+GPU-hours spent and still needed (from *measured* speed), its best validation loss, and how much
+work the last checkpoint protects. It reads each run's `status.json`, so nothing needs to be
+running.
+
+---
+
+## C.5 Talk to the model
+
+```bash
+uv run slm sample run-a1d5 --prompt "JULIET:\n" --tokens 300 --seed 1
+```
+```
+# run-a1d5f0a224ff · best · step 400 · val loss 1.3992
+JULIET:
+Why, came for the nost. He.
+
+DUKE OF AUMERLE:
+The very sir, this is the issue of the proud,
+And you go my happing exprise sweet appoised.
+
+KING EDWARD IV:
+Nay, again the bear; the valiant night
+Did Viclate her king, in the fries,
+```
+
+- A unique prefix of the run ID is enough (`run-a1d5`).
+- It uses `ckpt/best` (lowest validation loss) by default; `--which latest` uses the newest
+  checkpoint.
+- Try `--temperature 0` (always the most likely character: it soon loops), `--temperature 1.5`
+  (more inventive, more misspelt), `--top-k 5`. Same `--seed`, same text.
+- `\n` in `--prompt` is a real newline.
+
+---
+
+## C.6 The curves: TensorBoard
+
+```bash
+uv run tensorboard --logdir $SLM_HOME/runs
+```
+
+Open http://localhost:6006 in a Windows browser (WSL forwards `localhost`). Under **Scalars**:
+`loss/train`, `loss/val`, `lr` (the warmup ramp and the start of the cosine), `grad_norm`,
+`tokens_per_s`, `mfu`. Under **Text**: every sample, by step. Stop it with Ctrl-C when done.
+Nothing needs to be running *during* training; TensorBoard only reads the event files in `tb/`.
+
+---
+
+## C.7 Inside a run directory
+
+```bash
+cd $SLM_HOME/runs/run-a1d5f0a224ff
+ls; ls ckpt ckpt/best
+jq -c 'select(.kind=="eval") | {step, train_loss, val_loss}' metrics.jsonl
+du -sh ckpt/step_0000400
+```
+```
+ckpt  config.resolved.yaml  manifest.json  metrics.jsonl  status.json  tb  train.log
+ckpt: best  step_0000300  step_0000400
+ckpt/best: model.pt  optimizer.pt  state.pt
+{"step":0,"train_loss":4.370459203720093,"val_loss":4.369408130645752}
+{"step":100,"train_loss":1.8836883318424225,"val_loss":1.903482329249382}
+{"step":200,"train_loss":1.513597030043602,"val_loss":1.5650890219211577}
+{"step":300,"train_loss":1.3924472147226334,"val_loss":1.4568572574853897}
+{"step":400,"train_loss":1.3189196968078614,"val_loss":1.3991872245073318}
+122M	ckpt/step_0000400
+```
+
+- `122M` per checkpoint matches MODEL.md §6's estimate of ~12 bytes per parameter (weights and
+  two AdamW averages).
+- `train.log` is everything printed, flushed line by line, so it survives a power-off.
+  `metrics.jsonl` and `status.json` mean no tracking tool is ever *required*.
+- The contents of each file are described in the-training-loop.md §9.
+
+When you're done: `rm -rf /tmp/slm-c`. It was only ever a scratch home.
+
+---
+
+## Phase C: done when
+
+- [x] `make test` (89), `make test-gpu` (4) and `make lint` pass.
+- [x] A run learns: val 4.37 → 1.46 in 300 steps, samples going from noise to verse.
+- [x] The same command resumes with no jump; resume is exact in the test (difference 0.0).
+- [x] Ctrl-C under `uv run` checkpoints and exits cleanly.
+- [x] `runs list`, `sample` and TensorBoard all read the run without it running.
+- [ ] **You** have run C.1–C.7 and the output matches.
+
+Phase D is the real thing: the full reference run in `~/slm`, stopped and resumed, against the
+M1 exit criteria.
