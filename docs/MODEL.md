@@ -15,7 +15,7 @@ walk-through of the actual code, `concepts/the-model.md` (lands with Phase B).*
 | **Family** | Llama-style: pre-norm RMSNorm, RoPE, SwiGLU, no biases, tied embeddings |
 | **Compatibility target** | Hugging Face `LlamaForCausalLM`: same parameter names and maths |
 | **Sizes** | 6 presets, **0.85M → 304M** parameters (excluding embeddings) |
-| **Vocabulary** | Per project: ~65 (char) · ≤1K (small BPE) · ~1,970 (chess moves) |
+| **Vocabulary** | Per project: 67 (Shakespeare: 65 characters + 2 special tokens) · ≤1K (small BPE) · ~1,970 (chess moves) |
 | **Context length** | 256–1,024 tokens, set per experiment |
 | **Training precision** | bf16 mixed precision (fp32 weights and optimizer, bf16 matmuls) |
 | **Resume checkpoint** | Directory of PyTorch state files; slmkit-only |
@@ -98,7 +98,19 @@ parameters), and encoder-decoder models (no advantage for pure generation).
 **An export detail that bites.** Two conventions exist for applying RoPE: interleaved pairs
 (Meta's original code) and split halves (Hugging Face's `rotate_half`). They give different
 numbers from identical weights. slmkit uses the **HF convention**, so exported logits match
-`transformers` exactly. The M2 export parity test would catch a mismatch.
+`transformers` exactly. `tests/unit/test_hf_parity.py` loads slmkit weights into HF's
+`LlamaForCausalLM` and checks that the logits match; the measured difference is 0.0 in fp32.
+
+### Where training starts: initialization
+
+Every weight matrix and the embedding start as random Normal(0, 0.02). The two projections
+that write into the residual stream (`o_proj`, `down_proj`) start smaller, at 0.02 / √(2 ×
+n_layers), so the running sum of 2 × n_layers contributions doesn't grow with depth. RMSNorm
+gains start at 1. This is GPT-2's scheme, and nanoGPT's, which M1 has to match. The visible
+result: an untrained model's loss is close to **ln(vocab_size)** (4.20 for 67 tokens), meaning it
+is almost equally unsure of every token. `slm model` measures it (4.37 on real Shakespeare);
+a starting loss far above ln(V) means the initialization is broken. Details and rejected
+alternatives: `src/slmkit/model/init.py`.
 
 ---
 
@@ -152,9 +164,13 @@ SwiGLU MLP  gate, up, down projections  3 × 384 × 1024       = 1,179,648
 RMSNorm     two gain vectors            2 × 384              =       768
                                                      per layer 1,770,240
 6 layers + final RMSNorm (384)                                10,621,824
-embedding (tied, shared with LM head)   65 × 384             =    24,960
-                                                     total    10,646,784  (≈ nanoGPT's 10.65M)
+embedding (tied, shared with LM head)   67 × 384             =    25,728
+                                                     total    10,647,552  (≈ nanoGPT's 10.65M)
 ```
+
+The vocabulary is 67, not 65: Shakespeare has 65 distinct characters, and every slmkit
+tokenizer adds `<unk>` and `<eos>` (see `concepts/tokenization.md` §3). **Check it yourself:**
+`uv run slm model shakespeare_char/ref` prints exactly these numbers from the real model.
 
 Two-thirds of every block is the MLP. That ratio holds at every size, and it is why "a model is
 mostly matrix multiplies" is literally true.

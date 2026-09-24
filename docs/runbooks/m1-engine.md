@@ -9,8 +9,8 @@ result. It is split into four phases, each ending with this runbook checked by h
 
 | Phase | Builds | Status |
 |---|---|---|
-| **A** | Config, artifacts, Project API, char tokenizer, data pipeline | ☑ this page |
-| B | The model (`model/llama.py`) | ☐ |
+| **A** | Config, artifacts, Project API, char tokenizer, data pipeline | ☑ |
+| **B** | The model (`model/llama.py`) | ☑ this page |
 | C | Trainer, checkpoints/resume, sampling, tracking | ☐ |
 | D | The reference run, kill-and-resume | ☐ |
 
@@ -386,3 +386,254 @@ true, and a rule enforced by a test survives in a way a rule in a README does no
 - [x] The split has zero shared groups and exactly 11 validation blocks.
 - [x] `/mnt` paths are refused before anything is written.
 - [ ] **You** have run A.1–A.8 and the output matches.
+
+---
+
+# Phase B: the model
+
+*Concepts: [`../concepts/the-model.md`](../concepts/the-model.md). Specification:
+[`../MODEL.md`](../MODEL.md). Code: [`src/slmkit/model/`](../../src/slmkit/model/).*
+
+## B.0 The checks
+
+```bash
+make test        # 72 passed in ~3.5s  (includes the HF parity test, ~2s of it importing transformers)
+make test-gpu    # 3 passed in ~10s    (bf16 vs fp32, finite gradients, compiled vs eager)
+make lint
+```
+
+The first `make test-gpu` on a machine takes longer (~20s) because `torch.compile` builds
+kernels into `$TORCHINDUCTOR_CACHE_DIR`; later runs reuse them.
+
+---
+
+## B.1 Inspect the model an experiment builds
+
+**What.** `slm model <experiment>` builds the exact model the experiment would train (vocabulary
+from the tokenizer artifact, shape from the preset) and reports its size, cost and starting
+loss.
+
+```bash
+uv run slm model shakespeare_char/ref
+```
+```
+shakespeare_char/ref   model preset `ref`
+  vocab          67 (from tk-e4687abe1801)  ·  context 256 tokens
+  architecture   6 layers · d_model 384 · 6 heads x 64 · kv heads 6 · ffn 1024 · dropout 0.2
+  parameters       10,647,552 total
+                   10,621,824 non-embedding   (per layer 1,770,240 = attention 589,824 + mlp 1,179,648 + norms 768)
+                       25,728 embedding       (67 x 384, shared with the output head)
+  compute        71.0 MFLOPs per training token
+                 this run: 81,920,000 tokens = 5.81e+15 FLOPs ~ 2.3 GPU-min at 43 TFLOPS (small models run 2-3x slower than this)
+  memory         weights 40.6 MiB fp32 · training state ~162 MiB + activations · checkpoint ~122 MiB
+  sanity check   loss before training: 4.370 on 4 val batches   (a uniform guess scores ln 67 = 4.205)
+```
+
+**Check each line against the spec:**
+
+- `10,621,824 non-embedding` is exactly MODEL.md §4's figure for `ref`, and the per-layer split
+  matches the hand count there.
+- `25,728 embedding` = 67 × 384. The vocabulary is 67, not nanoGPT's 65, because of the two
+  special tokens (`tokenization.md` §3).
+- `71.0 MFLOPs per token` = 6 × (non-embedding + output head) + attention; see
+  `model/stats.py::flops_per_token`.
+- **The sanity check is the important line.** An untrained model should be almost equally unsure
+  of every character, which scores ln 67 = 4.205. 4.370 is close, as it should be. A number like 8
+  or 10 would mean the initialization is broken, and training would start from a bad place.
+
+Try another size without editing anything:
+
+```bash
+uv run slm model shakespeare_char/ref --set model.preset=nano
+```
+```
+  architecture   4 layers · d_model 128 · 4 heads x 32 · kv heads 4 · ffn 384 · dropout 0.0
+  parameters          861,696 total
+                      853,120 non-embedding   (per layer 213,248 = attention 65,536 + mlp 147,456 + norms 256)
+```
+
+**Why a command for this.** Before spending GPU time you want to know what you are about to
+train, like `terraform plan` before `apply`. It also catches a wrong preset or vocabulary before
+the trainer does.
+
+---
+
+## B.2 The module tree
+
+```bash
+uv run python -c "
+from slmkit.model import CausalLM, ModelArgs
+print(CausalLM(ModelArgs(vocab_size=67, block_size=256, n_layers=6, d_model=384,
+                         n_heads=6, n_kv_heads=6, ffn_hidden=1024, dropout=0.2)))"
+```
+```
+CausalLM(
+  (model): Decoder(
+    (embed_tokens): Embedding(67, 384)
+    (dropout): Dropout(p=0.2, inplace=False)
+    (layers): ModuleList(
+      (0-5): 6 x Block(
+        (input_layernorm): RMSNorm()
+        (self_attn): Attention(
+          (q_proj): Linear(in_features=384, out_features=384, bias=False)
+          (k_proj): Linear(in_features=384, out_features=384, bias=False)
+          (v_proj): Linear(in_features=384, out_features=384, bias=False)
+          (o_proj): Linear(in_features=384, out_features=384, bias=False)
+          (resid_dropout): Dropout(p=0.2, inplace=False)
+        )
+        (post_attention_layernorm): RMSNorm()
+        (mlp): MLP(
+          (gate_proj): Linear(in_features=384, out_features=1024, bias=False)
+          (up_proj): Linear(in_features=384, out_features=1024, bias=False)
+          (down_proj): Linear(in_features=1024, out_features=384, bias=False)
+          (dropout): Dropout(p=0.2, inplace=False)
+        )
+      )
+    )
+    (norm): RMSNorm()
+    (rope): RotaryEmbedding()
+  )
+  (lm_head): Linear(in_features=384, out_features=67, bias=False)
+)
+```
+
+Compare with the diagram in `MODEL.md` §2: every box is here, and `bias=False` everywhere.
+`RotaryEmbedding` has no parameters (its cos/sin tables are recomputed, not learned or saved).
+
+---
+
+## B.3 Same function as Hugging Face's Llama
+
+**What.** slmkit's weights load into HF's own `LlamaForCausalLM` with every name matching, and both
+produce the same logits.
+
+```bash
+uv run python -c "
+import torch
+from transformers import LlamaConfig, LlamaForCausalLM
+from slmkit.model import CausalLM, ModelArgs
+torch.manual_seed(0)
+a = ModelArgs(vocab_size=67, block_size=64, n_layers=2, d_model=128, n_heads=4, n_kv_heads=2, ffn_hidden=384)
+ours = CausalLM(a).eval()
+hf = LlamaForCausalLM(LlamaConfig(vocab_size=67, hidden_size=128, intermediate_size=384,
+    num_hidden_layers=2, num_attention_heads=4, num_key_value_heads=2, max_position_embeddings=64,
+    rms_norm_eps=a.norm_eps, rope_parameters={'rope_type': 'default', 'rope_theta': a.rope_theta},
+    tie_word_embeddings=True)).eval()
+print(hf.load_state_dict(ours.state_dict(), strict=True))
+x = torch.randint(0, 67, (3, 64))
+with torch.no_grad(): print('max abs diff', (ours(x)[0] - hf(x).logits).abs().max().item())"
+```
+```
+<All keys matched successfully>
+max abs diff 0.0
+```
+
+This uses grouped-query attention (`n_kv_heads=2`) on purpose, the least-travelled code path.
+Try changing `'rope_theta': a.rope_theta` to `500.0` in the HF config: the keys still match, but
+the difference jumps well above zero. That is how you know the comparison is sensitive.
+
+**Why.** It is the proof behind "export is a rename" (MODEL.md §6) and it pins the RoPE
+convention (`the-model.md` §6), a mistake that would otherwise surface only in M2, as an
+exported model that quietly produces worse text.
+
+---
+
+## B.4 The past cannot see the future
+
+```bash
+uv run python -c "
+import torch
+from slmkit.model import CausalLM, ModelArgs
+torch.manual_seed(0)
+model = CausalLM(ModelArgs(vocab_size=67, block_size=32, n_layers=2, d_model=64,
+                           n_heads=4, n_kv_heads=4, ffn_hidden=192)).eval()
+a = torch.randint(0, 67, (1, 20)); b = a.clone(); b[0, 12:] = (b[0, 12:] + 1) % 67
+with torch.no_grad(): diff = (model(a)[0] - model(b)[0]).abs().amax(dim=-1)[0]
+print('max |logit change| per position:', [round(d, 3) for d in diff.tolist()])"
+```
+```
+max |logit change| per position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.228, 1.259, 1.015, 1.145, 1.289, 0.992, 1.202, 1.703]
+```
+
+Tokens from position 12 on were changed. Positions 0–11 are **exactly** 0.0: their predictions do
+not depend on anything after them. **Why:** if the mask leaked, every position could read its own
+answer, training loss would collapse toward zero, and generation (where the future does not
+exist yet) would produce garbage.
+
+---
+
+## B.5 Overfit one batch
+
+The first thing to run when a trainer misbehaves (CONTRIBUTING.md's debugging order starts here). One
+fixed batch, trained on repeatedly, must be memorized:
+
+```bash
+uv run python -c "
+import torch
+from slmkit.model import CausalLM, ModelArgs
+torch.manual_seed(0)
+model = CausalLM(ModelArgs(vocab_size=67, block_size=32, n_layers=2, d_model=64,
+                           n_heads=4, n_kv_heads=4, ffn_hidden=192))
+x = torch.randint(0, 67, (4, 32)); y = torch.roll(x, -1, dims=1)
+opt = torch.optim.AdamW(model.parameters(), lr=3e-3)
+for step in range(151):
+    _, loss = model(x, y)
+    if step % 25 == 0: print(f'step {step:3d}  loss {loss.item():.4f}')
+    opt.zero_grad(); loss.backward(); opt.step()"
+```
+```
+step   0  loss 4.2558      ← ≈ ln 67: knows nothing
+step  25  loss 0.6805
+step  50  loss 0.0561
+step  75  loss 0.0208
+step 100  loss 0.0135
+step 125  loss 0.0099
+step 150  loss 0.0077      ← memorized
+```
+
+**Why.** It needs no data pipeline, no schedule and no GPU, so if it fails, the fault is in the
+model, the loss or the optimizer wiring, and nowhere else. It proves the model *can* learn; the
+reference run in Phase D proves it learns *the right thing*.
+
+---
+
+## B.6 `torch.compile` and the M0 gap it exposed
+
+```bash
+uv run slm doctor | grep compile
+```
+```
+  PASS  torch.compile            Triton kernel built and ran
+```
+
+This line is new. The first run of the GPU tests failed with:
+
+```
+fatal error: Python.h: No such file or directory
+```
+
+The first time `torch.compile` compiles a function, Triton builds a small C helper against Python's
+headers. Those headers come from `python3-dev`, which M0's setup script didn't install. Nothing in
+M0 compiled anything, so `doctor` passed anyway. Fixed in three places: the setup script now
+installs `python3-dev`, `doctor` runs a real compile, and the M0 runbook and STACK.md say why.
+**The lesson, again: check behaviour, not presence.**
+
+To see the check fail on purpose (fake compiler, empty caches so nothing is reused):
+
+```bash
+CC=/bin/false TRITON_CACHE_DIR=/tmp/tc TORCHINDUCTOR_CACHE_DIR=/tmp/ic uv run slm doctor | grep compile
+```
+```
+  FAIL  torch.compile            CalledProcessError: Command '['/bin/false', '/tmp/…/cuda_utils.c', …
+```
+
+---
+
+## Phase B: done when
+
+- [x] `make test`, `make test-gpu` and `make lint` pass.
+- [x] `slm model shakespeare_char/ref` reports 10,621,824 non-embedding parameters and an
+      initial loss near ln 67.
+- [x] HF parity: all keys match, max logit difference 0.0.
+- [x] Causality holds exactly; one batch is memorized.
+- [ ] **You** have run B.1–B.6 and the output matches.

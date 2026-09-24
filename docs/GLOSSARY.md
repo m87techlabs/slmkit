@@ -115,6 +115,12 @@ because the models are small enough not to need it.
 **Logits.** The raw, unnormalized scores the model outputs — one per vocabulary entry. Softmax
 turns them into probabilities.
 
+**Dropout.** During training only, randomly zeroing a fraction of activations (20% in the
+`ref` preset), so the network cannot rely on any single path. A regularizer for small datasets.
+
+**Initialization.** The random values weights start from. It decides whether training can start
+at all: too large and activations explode, too small and gradients vanish.
+
 **Causal / autoregressive.** *Causal*: each position may only look at earlier positions, enforced
 by a mask. *Autoregressive*: generation feeds each output token back in as input for the next.
 Every model in slmkit is both. See [`MODEL.md`](MODEL.md) §1.
@@ -233,6 +239,9 @@ machinery. It is the default for modern training.
 
 **TF32.** An NVIDIA format used automatically for fp32 matrix multiplies on recent GPUs. Faster,
 slightly less precise, on by default in slmkit.
+
+**Autocast.** PyTorch's mixed-precision switch: inside `torch.autocast(dtype=bfloat16)`, matrix
+multiplies run in bf16 while weights, norms and the loss stay in fp32.
 
 **Mixed precision.** Computing in bf16 while keeping a master copy of weights in fp32. Nearly
 the speed of low precision with nearly the stability of high precision.
@@ -410,6 +419,9 @@ manifests backwards with `slm lineage` to get from a model to its raw data.
 **ADR — Architecture Decision Record.** A short document in `docs/decisions/` capturing one
 decision: the context, what was chosen, the consequences, and what was rejected. It exists so
 that in six months nobody re-argues a settled question.
+
+**Meta device.** A PyTorch "device" that records tensor shapes without allocating memory. The
+tests use it to count the parameters of a 300M-parameter model instantly.
 
 **JSONL — JSON Lines.** A text file with one JSON object per line. slmkit's datasets store one
 document per line, so they can be streamed and inspected with `head` or `jq`.

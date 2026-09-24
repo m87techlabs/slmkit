@@ -350,7 +350,7 @@ slmkit/
 │   ├── data/                 # group split, packing, memmap sampler, SFT collation
 │   ├── tokenizers/           # base char bpe fixed_vocab
 │   ├── graders/              # GENERIC graders shared across projects
-│   ├── model/                # llama.py presets.py init.py
+│   ├── model/                # llama.py init.py stats.py (presets live in presets/)
 │   ├── train/                # trainer optim schedule checkpoint guards
 │   ├── sampling/             # generate(), temperature/top-k/top-p, logits_processor hook
 │   ├── eval/                 # runner, multi-seed aggregation, runs compare

@@ -45,7 +45,7 @@ Goal: prove the trainer is correct against a published result before trusting an
 - [x] `registry.py` + `project_api.py` — minimal version, enough for one project.
 - [x] `tokenizers/char.py`.
 - [x] `data/` — group split, packing to `uint16` memmap, random-offset batch sampler.
-- [ ] `model/llama.py` — RMSNorm, RoPE, SwiGLU, SDPA, tied embeddings, presets.
+- [x] `model/llama.py` — RMSNorm, RoPE, SwiGLU, SDPA, tied embeddings, presets.
 - [ ] `train/` — trainer, AdamW, cosine+warmup in tokens, clipping, guards, full-state
       checkpoint/resume, throughput and GPU-hours-remaining logging.
 - [ ] `tracking/` — tensorboard + noop.
