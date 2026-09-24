@@ -351,12 +351,12 @@ slmkit/
 │   ├── tokenizers/           # base char bpe fixed_vocab
 │   ├── graders/              # GENERIC graders shared across projects
 │   ├── model/                # llama.py init.py stats.py (presets live in presets/)
-│   ├── train/                # trainer optim schedule checkpoint guards
+│   ├── train/                # trainer optim schedule checkpoint guards seed run
 │   ├── sampling/             # generate(), temperature/top-k/top-p, logits_processor hook
 │   ├── eval/                 # runner, multi-seed aggregation, runs compare
 │   ├── export/               # hf.py (safetensors + config.json), gguf.md
 │   ├── serve/                # app.py (FastAPI), constrained decoding via project hook
-│   ├── tracking/             # base tensorboard wandb noop
+│   ├── tracking/             # tensorboard, noop (wandb later)
 │   └── doctor.py
 ├── projects/                 # ONE DIRECTORY PER LLM
 │   ├── _template/            # copy this to start a new one
@@ -511,6 +511,11 @@ saturate tensor cores, so `nano`/`micro` realistically reach 10–20% while `sma
 should reach 25–45%. Do not gate a milestone on one band across all sizes. At the smallest
 presets, `torch.compile(mode="reduce-overhead")` and CUDA graphs matter more than anything else,
 because the loop is partly kernel-launch-bound.
+
+**Measured in M1** (Shakespeare, batch 64 × 256, `torch.compile`, bf16): `nano` 24%, `micro` 42%,
+`ref` 51%, `tiny` 54% of the measured bf16 peak. The 10–20% expectation above was pessimistic:
+compile fusing the small operations closes most of the gap from `micro` upwards. Only `nano` is
+clearly launch-bound. See `concepts/the-training-loop.md` §8.
 
 ### 6.7 Evaluation
 

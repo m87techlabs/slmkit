@@ -46,16 +46,16 @@ Goal: prove the trainer is correct against a published result before trusting an
 - [x] `tokenizers/char.py`.
 - [x] `data/` — group split, packing to `uint16` memmap, random-offset batch sampler.
 - [x] `model/llama.py` — RMSNorm, RoPE, SwiGLU, SDPA, tied embeddings, presets.
-- [ ] `train/` — trainer, AdamW, cosine+warmup in tokens, clipping, guards, full-state
+- [x] `train/` — trainer, AdamW, cosine+warmup in tokens, clipping, guards, full-state
       checkpoint/resume, throughput and GPU-hours-remaining logging.
-- [ ] `tracking/` — tensorboard + noop.
-- [ ] `sampling/` — `generate()` with temperature / top-k / top-p.
-- [ ] **Print generated samples at every eval, not just loss.** Non-negotiable: it is the only
+- [x] `tracking/` — tensorboard + noop.
+- [x] `sampling/` — `generate()` with temperature / top-k / top-p.
+- [x] **Print generated samples at every eval, not just loss.** Non-negotiable: it is the only
       visible payoff in this milestone.
-- [ ] `projects/shakespeare_char` with the `ref` preset (6L/384d/6h, block 256, dropout 0.2).
-- [ ] Unit tests: tokenizer round-trip, split leakage, packing, shapes, overfit-one-batch,
+- [x] `projects/shakespeare_char` with the `ref` preset (6L/384d/6h, block 256, dropout 0.2).
+- [x] Unit tests: tokenizer round-trip, split leakage, packing, shapes, overfit-one-batch,
       **resume equivalence**.
-- [ ] Write `docs/concepts/`: `tokenization.md`, `the-model.md` (what a decoder-only
+- [x] Write `docs/concepts/`: `tokenization.md`, `the-model.md` (what a decoder-only
       transformer does, walked through slmkit's own code), `the-training-loop.md` (loss, LR
       schedule, why warmup, what the guards catch).
 - [ ] Write `docs/runbooks/m1-engine.md`: how to verify each M1 piece by hand (run the
@@ -67,8 +67,9 @@ Goal: prove the trainer is correct against a published result before trusting an
   are close but not identical — see DESIGN §5.0).
 - Kill the process mid-run, reboot the machine, restart: it resumes and the loss curve continues
   without a jump.
-- Achieved MFU is logged and plausible **for the preset size** (10–20% at `nano`/`micro`,
-  25–45% at `small`+ — DESIGN §6.6).
+- Achieved MFU is logged and plausible **for the preset size**. Measured in Phase C: ~24% at
+  `nano`, ~42% at `micro`, ~51% at `ref`, ~54% at `tiny` (the design's 10–20% guess for small
+  presets was pessimistic; DESIGN §6.6).
 - `make test` passes on CPU in under 60 s.
 
 ---

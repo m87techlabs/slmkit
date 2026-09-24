@@ -156,6 +156,14 @@ choosing between". A loss of 1.5 means a perplexity of about 4.5.
 **Gradient.** The direction and amount each parameter should change to reduce the loss.
 Computed by **backpropagation**.
 
+**Backpropagation (backward pass).** Computing the gradient of the loss for every parameter by
+working backwards through the forward computation. PyTorch does it automatically (autograd) when
+you call `loss.backward()`.
+
+**Gradient norm.** One number for the overall size of the gradient (the square root of the sum of
+every parameter's squared gradient). Logged every step; a sudden spike warns of instability, and
+clipping caps it.
+
 **Step / iteration.** One batch forward, one backward, one parameter update.
 
 **Batch size.** How many sequences are processed per step. Bigger batches give less noisy
@@ -192,6 +200,10 @@ and recomputing them during the backward pass. Roughly 30% slower, substantially
 optimizer, scheduler, step count, data position and all random number generator states — so a
 resumed run is indistinguishable from an uninterrupted one. On a workstation that gets powered
 off, this is the most important feature in the trainer.
+
+**Resume equivalence.** The property that stopping a run and resuming it produces the same
+training as never having stopped. slmkit tests it exactly on the CPU; it is why checkpoints hold
+RNG states and the sampler position, not just weights.
 
 **Seed.** The number initializing all randomness. Same seed, same run. At small scale the spread
 across seeds often exceeds the effect you are trying to measure, so compare several.

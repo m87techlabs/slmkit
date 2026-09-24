@@ -382,6 +382,11 @@ PyTorch index cleanly (`[tool.uv.sources]`). We rejected pip + venv (no lockfile
 conda (a second, heavier package universe that tends to fight pip over CUDA libraries). Never
 `pip install` into the system Python.
 
+**One behaviour to know:** `uv run` forwards signals to the program it starts. A terminal Ctrl-C
+already reaches every process in the foreground group, so the program receives SIGINT **twice**.
+The trainer treats a repeat within one second as the same keypress (see
+`concepts/the-training-loop.md` §7).
+
 ### hatchling
 **●** · [docs](https://hatch.pypa.io/latest/)
 

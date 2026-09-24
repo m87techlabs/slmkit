@@ -14,7 +14,7 @@ until its pages exist — the documentation is part of the deliverable, not a fo
 | [`environment.md`](environment.md) | M0 ☑ | Why WSL, how the GPU reaches Linux, why `sm_120` matters, storage, reading the benchmark |
 | [`tokenization.md`](tokenization.md) | M1 ◐ | Turning text into tokens, splitting by group, packing, and the one-token shift |
 | [`the-model.md`](the-model.md) | M1 ◐ | What a decoder-only transformer does, walked through this repo's code |
-| `the-training-loop.md` | M1 | Loss, learning-rate schedules, warmup, and what the guards catch |
+| [`the-training-loop.md`](the-training-loop.md) | M1 ◐ | One step, the lr schedule, evals and samples, checkpoints and resume, MFU |
 | `sft.md` | M2 | Base vs instruction-tuned models, and why loss is masked on prompts |
 | `evaluation.md` | M2 | Programmatic graders, seeds, baselines, and detecting memorization |
 | `serving.md` | M4 | Export formats and when each is used |

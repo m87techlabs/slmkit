@@ -216,8 +216,11 @@ TFLOPS effective:
 | `small` | 510M | ~20 GPU-min | ~3.3 GPU-hours |
 | `medium` | 1.8G | ~70 GPU-min | ~12 GPU-hours |
 
-Small presets run well below the planning figure (MFU 10–20%), so expect 2–3× these times at
-`nano`–`ref`. The trainer replaces these estimates with measured tokens/sec after 50 steps.
+Measured MFU (M1, compiled bf16, 16,384 tokens per step) is 24% at `nano`, 42% at `micro`, 51% at
+`ref` and 54% at `tiny`. From `micro` up, real throughput **beats** the 43 TFLOPS planning figure
+(`ref` runs at 57), so this table is conservative there; only `nano` runs slower. The trainer
+replaces the estimate with measured tokens/sec after 50 steps. Details:
+`concepts/the-training-loop.md` §8.
 
 **Memory.** Training with AdamW in mixed precision needs about **16 bytes per parameter**: fp32
 weights (4), gradients (4) and two Adam moment buffers (4 + 4). Activations (intermediate values

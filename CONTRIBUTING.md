@@ -200,5 +200,6 @@ part of the current milestone — implement it rather than inventing a different
   GPU-hours (chess only); 1B is out of scope (~840).
 - AdamW mixed precision ≈ 16 bytes/param; 8-bit Adam ≈ 8 bytes/param. **Memory is not the
   binding constraint — compute is.**
-- MFU is size-dependent: 10–20% at `nano`/`micro`, 25–45% at `small`+.
+- MFU is size-dependent. Measured in M1: ~24% at `nano`, ~42% at `micro`, ~51% at `ref`, ~54% at
+  `tiny` (compiled bf16). The planning figure of ~43 TFLOPS is conservative from `micro` up.
 - ABC corpus ≈ 5–20M tokens → 1–5M param models. Chess → up to ~25–124M.

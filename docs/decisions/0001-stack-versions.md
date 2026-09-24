@@ -39,6 +39,8 @@ Exact resolved versions of everything else are in `uv.lock`.
 | `/mnt/c` sequential write | 229 MB/s | `dd`, buffered |
 | `/mnt/c` 4K random read | 26 MB/s | `dd`, buffered |
 | VRAM visible to torch | 15.9 GiB | `slm doctor` |
+| Training MFU, `nano` / `micro` / `ref` / `tiny` | 23.6% / 41.5% / 51.2% / 53.6% | `slm pretrain`, measured at step 50 (M1), batch 64 × 256, compiled bf16 |
+| Training throughput, `ref` | ~810K tokens/s = 57.4 TFLOPS | same |
 | RAM visible to the WSL VM | 11.7 GiB → **19.5 GiB** after `.wslconfig` `memory=20GB` | `/proc/meminfo` |
 
 ## Decision
