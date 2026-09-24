@@ -369,7 +369,10 @@ def report(checks: list[Check], ok: bool) -> None:
         target = Path(raw).expanduser() / "doctor.json"
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+            # Merge rather than overwrite: a plain `slm doctor` must not erase the throughput
+            # an earlier `--bench` measured, which the trainer uses for MFU.
+            previous = json.loads(target.read_text()) if target.is_file() else {}
+            target.write_text(json.dumps({**previous, **data}, indent=2, sort_keys=True) + "\n")
             print(f"measurements written to {target}")
         except OSError as exc:
             print(f"(could not write {target}: {exc})")
