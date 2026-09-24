@@ -15,6 +15,9 @@ until its pages exist — the documentation is part of the deliverable, not a fo
 | [`tokenization.md`](tokenization.md) | M1 ☑ | Turning text into tokens, splitting by group, packing, and the one-token shift |
 | [`the-model.md`](the-model.md) | M1 ☑ | What a decoder-only transformer does, walked through this repo's code |
 | [`the-training-loop.md`](the-training-loop.md) | M1 ☑ | One step, the lr schedule, evals and samples, checkpoints and resume, MFU |
+| [`learning-paradigms.md`](learning-paradigms.md) | M1 ☑ | Supervised, unsupervised, self-supervised; classification vs regression; where slmkit sits |
+| [`fitting.md`](fitting.md) | M1 ☑ | Underfitting and overfitting: expected curves next to three real runs, plus an animation |
+| [`metrics.md`](metrics.md) | M1 ☑ | Which metric when: loss, perplexity, bpc, accuracy, precision/recall, MAE/RMSE, calibration, MFU |
 | `sft.md` | M2 | Base vs instruction-tuned models, and why loss is masked on prompts |
 | `evaluation.md` | M2 | Programmatic graders, seeds, baselines, and detecting memorization |
 | `serving.md` | M4 | Export formats and when each is used |

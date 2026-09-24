@@ -1,4 +1,4 @@
-.PHONY: doctor test test-gpu lint fmt run
+.PHONY: doctor test test-gpu lint fmt run figures
 
 doctor:   ## environment checks; must pass before any training command
 	uv run slm doctor
@@ -17,3 +17,6 @@ fmt:
 
 run:      ## make run CFG=abc_music/micro_v1
 	uv run slm run $(CFG)
+
+figures:  ## regenerate docs/images/ from the runs in $SLM_HOME (needs: uv sync --extra docs)
+	uv run python scripts/make_figures.py

@@ -37,6 +37,28 @@ continue text. Everything downstream of this — RLHF, DPO — is out of scope f
 **The lifecycle.** slmkit's pipeline, and the thing this repo exists to teach:
 `ingest → prepare → tokenizer → pack → pretrain → SFT → eval → export → serve`.
 
+**Supervised learning.** Learning from examples that each come with the right answer (a
+**label**). See [`concepts/learning-paradigms.md`](concepts/learning-paradigms.md).
+
+**Unsupervised learning.** Learning structure (groups, anomalies, compact summaries) from data with
+no labels at all.
+
+**Self-supervised learning.** Supervised learning whose labels are cut out of the data itself, like
+"the next token". How every language model is pretrained, and why no human labelling is needed.
+
+**Reinforcement learning (RL).** Learning by acting and receiving a reward, with no right answer
+given. **RLHF** (RL from human feedback) uses it to tune chat assistants. slmkit does not use RL.
+
+**Classification.** Predicting which of a fixed set of categories is right. Next-token prediction is
+classification over the vocabulary.
+
+**Regression.** Predicting a number on a continuous scale (a price, a duration). Not used in slmkit.
+
+**Label.** The right answer attached to a training example.
+
+**Hyperparameter.** A setting chosen before training rather than learned: model size, learning rate,
+dropout, batch size, training length. In slmkit, one experiment YAML is one set of hyperparameters.
+
 ---
 
 ## Turning text into numbers
@@ -298,6 +320,26 @@ impression.
 **Grader.** In slmkit, a pure function scoring one generated output, returning named metrics.
 Every project must have at least one that runs without human judgment — this is the selection
 rule for what slmkit builds at all.
+
+**Generalization.** Doing well on data the model never trained on. Validation loss measures it.
+
+**Underfitting.** Train and validation loss both high and close together: the model is too small or
+trained too little to capture the pattern. See [`concepts/fitting.md`](concepts/fitting.md).
+
+**Bits per character (bpc).** Loss divided by ln 2: how many bits the model needs, on average, to
+encode each character. The fair way to compare models with different tokenizers.
+
+**Accuracy / top-k accuracy.** How often the model's single best guess (or one of its k best) is
+exactly right.
+
+**Precision, recall, F1.** For yes/no decisions: precision is how often a "yes" is right, recall is
+how many real yeses were caught, F1 balances the two. See [`concepts/metrics.md`](concepts/metrics.md).
+
+**MAE / RMSE.** Mean absolute error and root mean squared error: how far numeric predictions are off,
+in the target's own units. Regression metrics.
+
+**Calibration.** Whether predicted probabilities match reality: of everything forecast at 30%, did
+about 30% happen? **Log-loss** and the **Brier score** measure it.
 
 **Held-out.** Data the model never trained on.
 

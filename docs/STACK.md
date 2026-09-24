@@ -478,7 +478,35 @@ the engine never imports a project library.
 
 ---
 
-## 11. References (read, not installed)
+## 11. Documentation tooling
+
+### matplotlib (and Pillow)
+**○** extra `docs` · [matplotlib](https://matplotlib.org/stable/) · [Pillow](https://pillow.readthedocs.io/)
+
+**What it is.** Python's standard plotting library. Pillow is the imaging library it depends on;
+slmkit uses it to write the animated GIF.
+
+**Why.** `scripts/make_figures.py` draws every chart in `docs/images/` from real runs'
+`metrics.jsonl`, so the pictures can't drift from what the code did. It is an **optional extra**
+(`uv sync --extra docs`) because training never needs it. Rejected: hand-made images (they go stale
+silently) and plotting libraries that output interactive HTML (GitHub markdown shows images, not
+scripts). ADR 0004.
+
+### Mermaid
+**●** in the docs · [docs](https://mermaid.js.org/)
+
+**What it is.** A text syntax for diagrams (flowcharts, sequences) written inside Markdown code
+blocks. GitHub renders it natively; VS Code needs the "Markdown Preview Mermaid Support" extension,
+which `.vscode/extensions.json` recommends.
+
+**Why.** Architecture and pipeline diagrams in [`LIFECYCLE.md`](LIFECYCLE.md) live as text next to
+the prose, so a change to a diagram shows up in a diff and review like any other edit. Nothing to
+install for the build. Rejected: exported PNGs from a drawing tool, which can't be diffed or edited
+without the original tool.
+
+---
+
+## 12. References (read, not installed)
 
 | Item | Why it matters here | Link |
 |---|---|---|
@@ -488,7 +516,7 @@ the engine never imports a project library.
 
 ---
 
-## 12. Deliberately not used
+## 13. Deliberately not used
 
 Recorded here because "why not X?" is often the most useful question.
 

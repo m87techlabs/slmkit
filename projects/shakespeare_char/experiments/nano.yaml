@@ -1,0 +1,34 @@
+# The `nano` preset (0.85M parameters) on the reference settings: between underfit and `ref`.
+# Used in docs/concepts/fitting.md. Same data and token budget as `ref`.
+run:
+  name: shakespeare-nano
+  seed: 1337
+  tracker: tensorboard
+project:
+  name: shakespeare_char
+  args:
+    block_chars: 10000
+tokenizer:
+  type: char
+data:
+  block_size: 256
+  val_fraction: 0.1
+  append_eos: false
+model:
+  preset: nano
+train:
+  preset: default
+  max_tokens: 81_920_000    # 5,000 steps x 64 sequences x 256 tokens
+  batch_size: 64
+  lr: 1.0e-3
+  min_lr_ratio: 0.1         # nanoGPT decays to 1e-4
+  betas: [0.9, 0.99]        # beta2 0.99: few tokens per step, so average gradient size over more steps (~100)
+  warmup_tokens: 1_638_400  # 100 steps
+  eval_every_steps: 250
+  eval_iters: 200
+  eval_samples: 2           # ROMEO and JULIET at every eval: enough to watch it learn
+  compile: true
+eval:
+  num_samples: 8
+  seeds: [0]
+  temperature: 0.8

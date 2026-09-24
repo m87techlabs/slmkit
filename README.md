@@ -7,6 +7,12 @@ guided way to learn how language models actually work.**
 ingest → prepare → tokenizer → pack → pretrain → SFT → eval → export → serve
 ```
 
+![A 10.6M-parameter model learning Shakespeare from scratch](docs/images/watch-it-learn.gif)
+
+*The first reference model learning, trained from random weights in about 3 GPU-minutes: loss on
+the left, what it writes on the right. The end-to-end picture is in
+[`docs/LIFECYCLE.md`](docs/LIFECYCLE.md).*
+
 Most tutorials either fine-tune somebody else's model or stop at a toy training loop. slmkit
 covers the whole lifecycle: you train your own tokenizer, pretrain a model from random
 initialization, instruction-tune it, evaluate it with graders that cannot be fooled, export it
@@ -62,6 +68,7 @@ uv run slm run shakespeare_char/ref
 
 | | |
 |---|---|
+| [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) | **Start here.** The model development lifecycle, with diagrams of the pipeline, architecture and roadmap |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every abbreviation and term, in plain language |
 | [`docs/MODEL.md`](docs/MODEL.md) | The model: type, architecture features, hyperparameters, size presets, file formats |
 | [`docs/STACK.md`](docs/STACK.md) | Every tool and library: what it is, why it's used, what was rejected |
@@ -73,8 +80,9 @@ uv run slm run shakespeare_char/ref
 
 ## Status
 
-Early. The scaffold and design are in place; the engine is being implemented milestone by
-milestone. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+M0 (environment) and M1 (engine, validated by reproducing a published character-level
+Shakespeare result: best validation loss 1.29) are complete. M2, the first full-lifecycle project
+(ABC music), is next. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## License
 

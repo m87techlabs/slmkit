@@ -9,7 +9,8 @@
     "charliermarsh.ruff",
     "tamasfe.even-better-toml",
     "redhat.vscode-yaml",
-    "eamodio.gitlens"
+    "eamodio.gitlens",
+    "bierner.markdown-mermaid"   // renders the diagrams in docs/LIFECYCLE.md in the preview
   ],
   // Formatting is ruff's job (see `make lint`). A second formatter fighting it
   // produces diffs that fail CI for reasons nobody can see in the editor.

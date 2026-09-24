@@ -50,6 +50,9 @@ able to follow it without prior ML knowledge.
   *what* it is, *how* it was done, *how to verify it by hand* (commands plus real expected
   output captured by running them), and *why* it was done that way, including what was
   rejected. Update it whenever a verification step changes.
+- **Figures are generated, never hand-drawn.** Charts in `docs/images/` come from
+  `scripts/make_figures.py` (`make figures`) reading real runs; diagrams are Mermaid in the Markdown.
+  Regenerate figures when the runs they show change.
 - Explain the *why*, not the *what*. `docs/concepts/` is for understanding; docstrings are for
   interface.
 - Prefer a worked example with real numbers over an abstract description.

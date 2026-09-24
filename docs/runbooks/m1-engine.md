@@ -1037,6 +1037,34 @@ check is the M2 engine grader (`graders/`), shown here by hand first.
 
 ---
 
+## D.4 Beyond the pass mark: under- and overfitting side by side
+
+Two more experiments, each one YAML file differing from `ref` only in the model, show all three fitting
+regimes on the same data (under a minute of GPU each):
+
+```bash
+uv run slm pretrain shakespeare_char/underfit   # 13K parameters
+uv run slm pretrain shakespeare_char/nano       # 0.85M, no dropout
+uv run python scripts/val_metrics.py run-f6d4 run-d020 run-a1d5
+```
+```
+baseline: letter frequencies       loss 3.3264  ppl  27.84  bpc 4.799  top1  15.2%  top5  40.3%
+shakespeare-underfit (run-f6d4)    loss 1.8890  ppl   6.61  bpc 2.725  top1  43.7%  top5  78.4%
+shakespeare-nano (run-d020)        loss 1.3764  ppl   3.96  bpc 1.986  top1  58.3%  top5  86.2%
+shakespeare-ref (run-a1d5)         loss 1.2894  ppl   3.63  bpc 1.860  top1  60.7%  top5  87.7%
+```
+
+Then regenerate the figures from those runs (`uv sync --extra docs` once):
+
+```bash
+make figures
+```
+
+What the curves mean is in [`../concepts/fitting.md`](../concepts/fitting.md), and what each metric
+means is in [`../concepts/metrics.md`](../concepts/metrics.md).
+
+---
+
 ## M1: exit criteria
 
 - [x] Val loss ≤ 1.55, with a curve shaped like nanoGPT's: **1.2888** at step 1250 (D.2).

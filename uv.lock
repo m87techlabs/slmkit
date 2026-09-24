@@ -2116,6 +2116,9 @@ dev = [
     { name = "ruff" },
     { name = "types-pyyaml" },
 ]
+docs = [
+    { name = "matplotlib" },
+]
 export = [
     { name = "transformers" },
 ]
@@ -2130,6 +2133,7 @@ wandb = [
 requires-dist = [
     { name = "bitsandbytes", marker = "extra == 'optim8bit'", specifier = ">=0.45.3" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "matplotlib", marker = "extra == 'docs'", specifier = ">=3.9" },
     { name = "music21", marker = "extra == 'abc-music'", specifier = ">=9.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11" },
     { name = "numpy", specifier = ">=2.0" },
@@ -2148,7 +2152,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.30" },
     { name = "wandb", marker = "extra == 'wandb'", specifier = ">=0.17" },
 ]
-provides-extras = ["abc-music", "chess", "export", "wandb", "optim8bit", "dev"]
+provides-extras = ["abc-music", "chess", "export", "wandb", "optim8bit", "dev", "docs"]
 
 [[package]]
 name = "starlette"

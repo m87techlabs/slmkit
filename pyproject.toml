@@ -33,6 +33,7 @@ export    = ["transformers>=4.44"]   # HF export parity tests only
 wandb     = ["wandb>=0.17"]
 optim8bit = ["bitsandbytes>=0.45.3"]   # 8-bit Adam; verified on sm_120, see ADR 0001
 dev       = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0"]
+docs      = ["matplotlib>=3.9"]      # figures in docs/images/ (scripts/make_figures.py)
 
 [project.scripts]
 slm = "slmkit.cli:app"
