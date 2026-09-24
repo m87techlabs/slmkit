@@ -11,8 +11,8 @@ result. It is split into four phases, each ending with this runbook checked by h
 |---|---|---|
 | **A** | Config, artifacts, Project API, char tokenizer, data pipeline | ☑ |
 | **B** | The model (`model/llama.py`) | ☑ |
-| **C** | Trainer, checkpoints/resume, sampling, tracking | ☑ this page |
-| D | The reference run, kill-and-resume | ☐ |
+| **C** | Trainer, checkpoints/resume, sampling, tracking | ☑ |
+| **D** | The reference run, kill-and-resume | ☑ this page |
 
 Run everything from the repo root in `Ubuntu-ML`. Expected output is from the reference machine;
 paths show `~/slm` as `$SLM_HOME`.
@@ -891,3 +891,157 @@ When you're done: `rm -rf /tmp/slm-c`. It was only ever a scratch home.
 
 Phase D is the real thing: the full reference run in `~/slm`, stopped and resumed, against the
 M1 exit criteria.
+
+---
+
+# Phase D: the reference run
+
+*The M1 exit criteria, met on a real run in `~/slm`. Numbers below are from that run.*
+
+## D.1 Run it, stop it, resume it
+
+In `tmux`, with your real `$SLM_HOME`:
+
+```bash
+tmux new -s ref
+uv run slm pretrain shakespeare_char/ref
+# … press Ctrl-C part-way through …
+uv run slm pretrain shakespeare_char/ref        # same command: resumes
+```
+
+The whole run is ~82M tokens at ~830K tokens/s: **0.05 GPU-hours** (about 3 minutes including
+evals and compilation). The first session was stopped with Ctrl-C at 84.9%:
+
+```
+step   4200  loss 0.6951  lr 1.58e-04  gnorm 0.42  830,487 tok/s   84.0%  remaining 0.3 GPU-min
+SIGINT: finishing this step, then checkpointing. Press Ctrl-C again to abort without saving.
+stopped (SIGINT) at step 4247, 84.9% done. Run the same command to resume.
+```
+
+and the second session picked it up:
+
+```
+  RESUMING    from step_0004247 (84.9% done, saved 2026-09-24T13:10:44-05:00, 0.04 GPU-h so far)
+  remaining   12,337,152 tokens ~ 0.2 GPU-min (measured)
+step   4250  loss 0.7076  lr 1.51e-04  gnorm 0.42  warming up   85.0%  remaining 0.2 GPU-min
+…
+complete: 81,920,000 tokens, best val 1.2888, 0.05 GPU-h
+```
+
+**Check for a jump.** Training loss before the stop: 0.7506, 0.7216, 0.6951. After: 0.7076. That
+is ordinary step-to-step noise (the per-step loss is one batch with dropout on). The learning rate
+continues down the same curve, 1.58e-04 → 1.51e-04. A broken resume shows up as a loss back near
+1.3 or 4.2, or an lr back at warmup values.
+
+(The first line after a resume says `warming up` instead of a speed: those first 10 steps
+include recompiling, and the original version printed a misleading 25,135 tok/s there.)
+
+```bash
+uv run slm runs list
+```
+```
+RUN               NAME               TOKENS             DONE  GPU-h   LEFT BEST VAL  LAST CHECKPOINT        STATUS
+run-a1d5f0a224ff  shakespeare-ref    81.9M/81.9M      100.0%   0.05   0.00   1.2888  step 5000 · 1m ago     complete
+```
+
+Running the command again does nothing: `run already complete; nothing to do`.
+
+---
+
+## D.2 Read the curve
+
+```bash
+jq -r 'select(.kind=="eval") | "\(.step)\t\(.train_loss)\t\(.val_loss)"' \
+  ~/slm/runs/run-a1d5f0a224ff/metrics.jsonl
+```
+
+| Step | Tokens | Train | Val | Gap | |
+|---|---|---|---|---|---|
+| 0 | 0 | 4.3705 | 4.3694 | 0.00 | guessing (ln 67 = 4.20) |
+| 250 | 4.1M | 1.4440 | 1.5074 | +0.06 | past the bigram baseline (2.45) |
+| 500 | 8.2M | 1.2710 | 1.3608 | +0.09 | |
+| 1000 | 16.4M | 1.1252 | 1.2961 | +0.17 | |
+| **1250** | **20.5M** | **1.0710** | **1.2888** | +0.22 | **best → `ckpt/best`** |
+| 2000 | 32.8M | 0.9047 | 1.3125 | +0.41 | val rising: overfitting |
+| 3000 | 49.2M | 0.6855 | 1.4233 | +0.74 | |
+| 4000 | 65.5M | 0.5268 | 1.5400 | +1.01 | |
+| 5000 | 81.9M | 0.4424 | 1.6253 | +1.18 | end |
+
+Three phases. Until ~step 1250 both losses fall together: the model is learning things that are
+true of Shakespeare in general. After that, training loss keeps falling while validation loss
+rises: it is learning things that are true only of *these* 1M characters. By then it has seen the
+training text ~20 times, and it will see it ~80 times by the end.
+
+**Why the trainer keeps `ckpt/best`:** the final checkpoint is the *worst* model by validation loss
+since step 250. Without a separately kept best checkpoint, a run that overfits would hand you its
+most over-confident version. `slm sample` uses `best` by default for this reason.
+
+**Compared with nanoGPT.** nanoGPT reports ~1.47 on this data with a GPT-2-style model of the
+same size. slmkit's best is 1.29. The curve has the same shape (fast fall, minimum, overfit), but the
+numbers are not directly comparable: slmkit validates on 11 whole scenes spread through the file,
+nanoGPT on the last 10% of it, and slmkit's model is Llama-style (RoPE, SwiGLU). Leakage was ruled
+out separately: no 50-character passage of validation text occurs in training (the-training-loop.md
+§2).
+
+---
+
+## D.3 Is it copying? Measure, don't guess
+
+A rising validation loss is often described as "memorizing". Test that directly. Generate 3,000
+characters from the best and from the final checkpoint, then count how much appears verbatim in
+the training text:
+
+```bash
+uv run slm sample run-a1d5 --which best   --prompt "ROMEO:\n" --tokens 3000 --seed 0 > /tmp/best.txt
+uv run slm sample run-a1d5 --which latest --prompt "ROMEO:\n" --tokens 3000 --seed 0 > /tmp/latest.txt
+uv run python - <<'PY'
+import json
+from pathlib import Path
+D = Path.home() / "slm/datasets/shakespeare_char/ds-bdaf3875e330"
+train = "".join(json.loads(line)["text"] for line in open(D / "train.jsonl"))
+for name in ("best", "latest"):
+    text = Path(f"/tmp/{name}.txt").read_text().split("\n", 1)[1]
+    for n in (20, 40):
+        seen = {train[i:i + n] for i in range(len(train) - n)}
+        windows = [text[i:i + n] for i in range(len(text) - n)]
+        print(f"{name:6s} {n}-char windows found in training text: "
+              f"{sum(w in seen for w in windows) / len(windows):.1%}")
+PY
+```
+```
+best   20-char windows found in training text: 3.0%
+best   40-char windows found in training text: 0.0%
+latest 20-char windows found in training text: 3.1%
+latest 40-char windows found in training text: 0.0%
+```
+
+**It is not copying.** Neither checkpoint reproduces any 40-character passage, and the final
+model copies about as much as the best one (3.1% vs 3.0% of 20-character windows, mostly common
+phrases). The step-4247 checkpoint scored 2.4%: the same picture. What validation loss measures here is **over-confidence**.
+The final model puts very high probability on patterns specific to the training text, and
+cross-entropy punishes confident mistakes on unseen text heavily, even though its samples still
+read as plausible verse:
+
+```
+best (step 1250, val 1.29)                     latest (step 5000, val 1.63)
+ROMEO:                                         ROMEO:
+No part, faith, that same shows fair friends.  Nay, thou canst not know thou art a man:
+                                               Let me be long to say 'tis so. Hast thou now
+PERDITA:                                       Some one that is destroyed by thy life;
+Commend me at my pains: if you be this palace. To teach him by the other instance of a fear,
+```
+
+**Why this matters beyond Shakespeare:** loss and sample quality measure different things, and
+"val loss went up, so it must be memorizing" is a hypothesis, not a finding. This n-gram novelty
+check is the M2 engine grader (`graders/`), shown here by hand first.
+
+---
+
+## M1: exit criteria
+
+- [x] Val loss ≤ 1.55, with a curve shaped like nanoGPT's: **1.2888** at step 1250 (D.2).
+- [x] Stop mid-run and restart: resumes with no jump in loss or learning rate (D.1). Tested as a
+      process restart (Ctrl-C, then a fresh process loading the checkpoint from disk), not a
+      machine reboot. A reboot additionally tests that the fsync'd files survive a power cut.
+- [x] MFU logged and plausible for the size: 52.9% at `ref` (Phase C, C.1).
+- [x] `make test` on the CPU in under 60 s: 89 tests in ~8 s.

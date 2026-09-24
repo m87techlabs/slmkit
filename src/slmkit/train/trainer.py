@@ -407,9 +407,12 @@ class Trainer:
                     self._report_throughput(window_tokens / window_time)
 
                 if self.step % cfg.log_every_steps == 0:
-                    tok_s = window_tokens / window_time if window_time else 0.0
+                    # Before step 10 of a session the window still includes compilation, so
+                    # its rate would be misleadingly low (25K tok/s on a resume, not 830K).
+                    warm = steps_this_session > THROUGHPUT_WARMUP_STEPS and window_time > 0
+                    tok_s = window_tokens / window_time if warm else 0.0
                     rate = self.measured_tok_s or tok_s
-                    speed = f"{tok_s:,.0f} tok/s" if tok_s else "measuring"
+                    speed = f"{tok_s:,.0f} tok/s" if warm else "warming up"
                     eta = (
                         _fmt_hours((cfg.max_tokens - self.tokens_seen) / rate / 3600)
                         if rate

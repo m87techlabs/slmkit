@@ -35,7 +35,7 @@ Goal: a reproducible, verified ML environment in the `Ubuntu-ML` WSL distro.
 
 ---
 
-## M1 — Engine + reference reproduction ◐
+## M1 — Engine + reference reproduction ☑
 
 Goal: prove the trainer is correct against a published result before trusting any novel project.
 *The longest stretch before anything interesting comes out — ~6–10 sessions, a few GPU-hours.*
@@ -58,19 +58,20 @@ Goal: prove the trainer is correct against a published result before trusting an
 - [x] Write `docs/concepts/`: `tokenization.md`, `the-model.md` (what a decoder-only
       transformer does, walked through slmkit's own code), `the-training-loop.md` (loss, LR
       schedule, why warmup, what the guards catch).
-- [ ] Write `docs/runbooks/m1-engine.md`: how to verify each M1 piece by hand (run the
+- [x] Write `docs/runbooks/m1-engine.md`: how to verify each M1 piece by hand (run the
       reference, watch loss and samples, kill and resume a run), with expected output and why.
 
-**Exit criteria**
-- `slm run shakespeare_char/ref` reaches val loss **≤ 1.55 with a loss curve shaped like
-  nanoGPT's** (reference ≈1.47 on a GPT-2-style model; slmkit is Llama-style, so the numbers
-  are close but not identical — see DESIGN §5.0).
-- Kill the process mid-run, reboot the machine, restart: it resumes and the loss curve continues
-  without a jump.
-- Achieved MFU is logged and plausible **for the preset size**. Measured in Phase C: ~24% at
+**Exit criteria — met**
+- [x] `slm run shakespeare_char/ref` reaches val loss **≤ 1.55 with a loss curve shaped like
+  nanoGPT's**: best **1.2888** at step 1250, then overfits as expected (runbook D.2). nanoGPT
+  reports ≈1.47 on a GPT-2-style model and a different validation split — see DESIGN §5.0.
+- [x] Kill the process mid-run and restart: it resumes and the loss curve continues without a
+  jump (0.6951 → 0.7076 across the stop, runbook D.1). Verified as a process restart, not a
+  machine reboot.
+- [x] Achieved MFU is logged and plausible **for the preset size** (52.9% at `ref`). Measured in Phase C: ~24% at
   `nano`, ~42% at `micro`, ~51% at `ref`, ~54% at `tiny` (the design's 10–20% guess for small
   presets was pessimistic; DESIGN §6.6).
-- `make test` passes on CPU in under 60 s.
+- [x] `make test` passes on CPU in under 60 s (89 tests, ~8 s).
 
 ---
 

@@ -91,6 +91,19 @@ Llama-style model converges quickly. The real risk is what happens *next*: train
 falling while validation loss rises, i.e. **overfitting**. That is why the trainer keeps a separate
 `best` checkpoint, chosen by validation loss, and not just the last one.
 
+### What the full run showed
+
+The complete reference run (Phase D in the runbook) bottomed out at **val 1.2888 at step 1250**,
+about 20 passes over the training text, then overfit: by step 5000 training loss was 0.44 and
+validation 1.63. Two lessons, both measured:
+
+- **The final checkpoint was the worst one.** Validation loss rose from step 1250 to the end. That is
+  why `ckpt/best` is kept separately and is what `slm sample` loads by default.
+- **Rising validation loss did not mean copying.** Samples from the final checkpoint contain no
+  40-character passage from the training text, just like the best one. The model became
+  over-confident about training-specific patterns; its text still reads as plausible verse. Loss and
+  samples measure different things, and "it's memorizing" had to be checked, not assumed.
+
 ---
 
 ## 3. The learning-rate schedule: warmup, then cosine, in tokens
