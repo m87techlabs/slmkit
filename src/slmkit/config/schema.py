@@ -92,6 +92,8 @@ class TrainConfig(_Strict):
     eval_every_steps: int = Field(250, gt=0)
     eval_iters: int = Field(50, gt=0)  # batches averaged per val-loss estimate
     eval_samples: int = Field(8, gt=0)  # generated samples printed at every eval
+    sample_tokens: int = Field(200, gt=0)  # length of each of those samples
+    log_every_steps: int = Field(50, gt=0)
     ckpt_every_minutes: float = Field(20.0, gt=0.0)
     keep_last_n_ckpts: int = Field(3, gt=0)
     max_consecutive_skips: int = Field(20, gt=0)

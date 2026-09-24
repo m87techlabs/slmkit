@@ -117,7 +117,7 @@ def build_manifest(
     }
 
 
-def _fsync_tree(root: Path) -> None:
+def fsync_tree(root: Path) -> None:
     """Flush every file, then every directory entry, to disk before the rename."""
     for dirpath, _dirs, files in os.walk(root):
         for name in files:
@@ -159,7 +159,7 @@ def commit_dir(final: Path, manifest: dict[str, Any]) -> Iterator[Path]:
     try:
         yield tmp
         (tmp / MANIFEST).write_text(json.dumps(manifest, indent=2, sort_keys=False) + "\n")
-        _fsync_tree(tmp)
+        fsync_tree(tmp)
         os.rename(tmp, final)
         fd = os.open(final.parent, os.O_RDONLY)
         try:

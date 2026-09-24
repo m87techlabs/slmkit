@@ -22,10 +22,11 @@ train:
   batch_size: 64
   lr: 1.0e-3
   min_lr_ratio: 0.1         # nanoGPT decays to 1e-4
-  betas: [0.9, 0.99]        # beta2 0.99: few tokens per step, so average over fewer steps
+  betas: [0.9, 0.99]        # beta2 0.99: few tokens per step, so average gradient size over more steps (~100)
   warmup_tokens: 1_638_400  # 100 steps
   eval_every_steps: 250
   eval_iters: 200
+  eval_samples: 2           # ROMEO and JULIET at every eval: enough to watch it learn
   compile: true
 eval:
   num_samples: 8
