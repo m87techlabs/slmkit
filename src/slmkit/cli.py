@@ -128,8 +128,11 @@ def lineage(
             f"created {m['created']}  git {m.get('git_sha')}{dirty}"
         )
         for key, value in m.get("stats", {}).items():
-            if isinstance(value, dict):
-                value = ", ".join(value)  # e.g. raw file names
+            if isinstance(value, dict):  # e.g. raw file names: list a few, count the rest
+                names = list(value)
+                value = ", ".join(names[:3]) + (
+                    f", ... ({len(names)} total)" if len(names) > 3 else ""
+                )
             typer.echo(f"{pad}    {key} = {value}")
 
 
