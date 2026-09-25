@@ -82,7 +82,7 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 
 - [x] `projects/abc_music`: ingest public-domain tune books (ADR 0005; The Session's licence forbids LLM training); clean; group by melody fingerprint + title.
 - [x] Augmentation: transposition within ±2 semitones into ≤3-accidental keys (train split only, verified note-for-note with `abc2midi`); header dropout.
-- [ ] Tokenizers: `char` baseline; add `bpe.py` (HF `tokenizers`) and compare.
+- [x] Tokenizers: `char` baseline; add `bpe.py` (HF `tokenizers`) and compare: 1.812 vs 1.824 bpc at equal compute, one seed each (tokenization.md §6); the 3-seed comparison is in the Phase F sweep.
 - [ ] `graders/` (engine): n-gram novelty, parse-rate wrapper.
 - [ ] Project graders: bar durations vs `M:`, tonic cadence, prompt adherence.
 - [ ] SFT: prompt templates, prompt-token loss masking, plus a unit test.

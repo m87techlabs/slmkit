@@ -47,8 +47,9 @@ Notes:
   came first.
 - **Perplexity and bpc depend on the tokenizer.** A BPE model's tokens are ~3–4 characters each, so
   its per-token perplexity is far higher even when it is the better model. Compare across tokenizers
-  in **bits per character**, never in per-token loss. This matters in M2, which compares char vs BPE
-  on ABC music.
+  in **bits per character**, never in per-token loss. M2 measured exactly this trap on ABC music:
+  BPE's per-token perplexity was 10.49 against char's 3.51, yet in bits per character they were
+  1.824 and 1.812 (tokenization.md §6).
 - **Accuracy understates a language model.** After `ROMEO:\n` many next characters are reasonable. A
   model that spreads probability sensibly across them scores a good loss but a mediocre top-1. That is
   why top-5 is 88% while top-1 is 61%.

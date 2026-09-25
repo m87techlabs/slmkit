@@ -83,6 +83,15 @@ general-purpose LLMs use.
 character the tokenizer never saw in training) and `<eos>` (ID 1: end of document) in every
 tokenizer. See [`concepts/tokenization.md`](concepts/tokenization.md) §3.
 
+**Merge (BPE).** One step of BPE training: the most frequent adjacent pair of tokens becomes a new
+token. A 512-token BPE vocabulary is the base characters plus ~420 merges.
+
+**Pre-tokenization / pre-splitting.** Cutting text into chunks before BPE, so no token can span two
+chunks. slmkit attaches a space to the chunk after it (GPT-2 style) and keeps newlines separate.
+
+**Compression (tokenizer).** Characters per token on real text: 1.00 for a char tokenizer, 1.87 for
+slmkit's 512-token BPE on ABC, ~3–4 for typical English BPE.
+
 **Fixed vocabulary.** A hand-specified token list for a domain with a known, finite symbol set —
 for example one token per legal chess move. Impossible for natural language, ideal when it
 applies.

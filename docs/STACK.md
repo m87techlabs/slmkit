@@ -222,15 +222,17 @@ constraint, so it stays optional. It must be A/B tested against fp32 AdamW befor
 ## 4. Tokenization, weights and model formats
 
 ### Hugging Face `tokenizers`
-**◐ M2** (BPE) · `0.23` · [docs](https://huggingface.co/docs/tokenizers)
+**●** (BPE, since M2) · `0.23` · [docs](https://huggingface.co/docs/tokenizers)
 
 **What it is.** A fast Rust-backed library for training and running subword tokenizers such as
 BPE.
 
 **Why.** Training a BPE tokenizer is a well-solved, performance-sensitive problem, and teaches
 little when written by hand. M1's character tokenizer is hand-written because it is ten lines
-long; M2's BPE comes from this library. Its output format is also what HF `transformers` expects,
-so exported models are compatible.
+long; M2's BPE comes from this library (`tokenizers/bpe.py`: GPT-2-style pre-splitting, trained on
+the train split, specials at the same IDs as the char tokenizer). Its output format is also what HF
+`transformers` expects, so exported models are compatible. Rejected: byte-level BPE, which reserves
+256 base IDs when ABC uses 87 characters (tokenization.md §6).
 
 ### safetensors
 **◐ M2** (export) · `0.8` · [docs](https://huggingface.co/docs/safetensors)

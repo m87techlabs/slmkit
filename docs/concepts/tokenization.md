@@ -41,7 +41,7 @@ ID into a learned vector, so the vocabulary size directly sets how big that laye
 | Type | A token is | Vocab size | Shakespeare as tokens | slmkit uses it for |
 |---|---|---|---|---|
 | **Character** | one character | ~65 | 1,115,394 | M1 Shakespeare; ABC baseline |
-| **BPE** (byte-pair encoding) | a frequent chunk of characters, learned from data | ~1K–50K | 338,025 with GPT-2's 50K vocab (~3.3 chars/token) | ABC comparison (M2) |
+| **BPE** (byte-pair encoding) | a frequent chunk of characters, learned from data | ~1K–50K | 338,025 with GPT-2's 50K vocab (~3.3 chars/token) | ABC, compared with char in §6 (M2) |
 | **Fixed vocabulary** | one domain unit, listed by hand | exactly what the domain needs | — | chess moves (1,968 UCI moves), cricket ball events |
 
 The trade-off is **vocabulary size against sequence length**:
@@ -177,3 +177,103 @@ Phase C).
 | Vocab over 65,535 | IDs silently wrap around in `uint16` | `pack_split` raises |
 | Upstream data changed | A "reproducible" run trains on different text | SHA-256 pinned in `project.py` |
 | Stale artifact reused after a code change | Old data under a new config | Stage `CODE_VERSION` and project `data_version` in the artifact ID |
+
+---
+
+## 6. BPE, built and measured (M2)
+
+*Code: [`src/slmkit/tokenizers/bpe.py`](../../src/slmkit/tokenizers/bpe.py). Hands-on: runbook M2 §B.*
+
+### How the merges are learned
+
+**Byte-pair encoding** starts with single characters and repeats one step: find the most frequent
+pair of adjacent tokens in the training text and merge it into a new token. Every merge adds one
+entry to the vocabulary, and training stops at the target size. The real merges learned on ABC
+(numbered in the order they were learned):
+
+```
+#1   ' ' '|'     → ' |'           the very first merges: a space and a bar line,
+#2   ' ' '('     → ' ('           then a space and each common note (' c', ' d', ' e', ...)
+#28  ' A' '2'    → ' A2'          a note with its length
+#30  'M' ':'     → 'M:'           every tune has a meter line
+#121 'M:' '6'    → 'M:6'
+#123 'M:6' '/8'  → 'M:6/8'        the whole header is now one token
+#292 ' A2' ':|'  → ' A2:|'        "a half note, then repeat": a standard phrase ending
+```
+
+Nothing told it these are musical units. They are simply what ABC repeats most. The 15 longest
+tokens it learned at a 512 vocabulary include every common header (`R:hornpipe`, `R:reel`, `M:6/8`,
+`L:1/16`), phrase endings (`' A2:|'`, `' G2:|'`) and a scale run (`' gfed'`).
+
+The merges are trained on the **train split only**, like the char vocabulary (§3), and with the same
+two special tokens at the same IDs: `<unk>` = 0, `<eos>` = 1.
+
+### What merges may cross: pre-splitting
+
+Before merging, text is cut into chunks, and no token can span two chunks. That choice matters more
+than it looks. Measured at a 512 vocabulary on the ABC validation split:
+
+| Pre-splitting | Characters per token | What tokens look like |
+|---|---|---|
+| spaces and newlines are their own tokens | 1.55 | `' '`, `'|'`, `' '`, `'('`: a third of all tokens are single spaces |
+| **a space joins the chunk after it** (GPT-2's scheme; newlines alone) | **1.87** | `' |'`, `' ('`, `'c2'`: musical units |
+| no pre-splitting at all | 2.16 | `') | ('`, `' \\\n|'`: tokens straddle bar lines and phrases |
+
+slmkit uses the middle row. The last row compresses a little more, but a token like `') | ('` has no
+musical meaning, which makes the model's vocabulary harder to read and its behaviour harder to reason
+about. **Rejected:** byte-level BPE (GPT-2's 256-byte base alphabet). ABC uses 87 characters, so ~170
+IDs would never occur, and there are no non-ASCII characters that need byte fallback.
+
+### Vocabulary size vs compression
+
+| Vocabulary | Characters per token | Validation tokens (106,612 characters, `<eos>` not counted) |
+|---|---|---|
+| 87 (char) | 1.00 | 106,612 |
+| 128 | 1.30 | 81,699 |
+| 256 | 1.63 | 65,404 |
+| **512** | **1.87** | **57,152** |
+| 1,024 | 2.10 | 50,849 |
+| 2,048 | 2.31 | 46,120 |
+
+Diminishing returns: doubling from 512 to 1,024 buys 12% more compression, and costs 65,536 extra
+embedding parameters (512 more rows of 128) on a `nano` model that has 853K others. That is why DESIGN caps ABC's BPE at
+~1K. ABC compresses far less than English (~3–4 characters per token at similar vocabularies) because
+it has few long repeated words: most of it is short note groups separated by spaces.
+
+### Char vs BPE: the A/B
+
+Two runs identical except for the tokenizer (`abc_music/baseline` and `abc_music/bpe512`): same
+`nano` model, same 512-token context, same 30M-token budget, so the same compute. Each best
+checkpoint, scored on the full validation split with `scripts/val_metrics.py`:
+
+| | Char (vocab 87) | BPE (vocab 512) |
+|---|---|---|
+| Loss per token | 1.256 | 2.350 |
+| Perplexity per token | 3.51 | 10.49 |
+| Top-1 accuracy per token | 60.8% | 42.0% |
+| Characters per token | 1.00 | 1.86 |
+| **Bits per character** | **1.812** | **1.824** |
+
+**The trap in the first three rows.** Judged per token, BPE looks far worse: three times the
+perplexity, 19 points less accurate. But each BPE token is 1.86 characters, so every guess predicts
+more text and is harder. Per-token numbers are only comparable between models with the *same*
+tokenizer. Bits per character divides the total loss by characters instead, and there the two are
+within 0.7% of each other. The trainer prints bpc on every eval line for exactly this reason:
+
+```
+eval  step    916  train 2.1510  val 2.3531  (gap +0.2021, 1.826 bpc)  * best
+```
+
+**Reading the result.** At equal compute, on this corpus, the tokenizer barely matters for
+prediction quality, and a single seed can't separate 1.812 from 1.824 (Phase F runs three).
+Differences that do show:
+
+- **BPE sees 1.86× more text** for the same compute and the same 512-token context. That helps with
+  long-range structure (a whole tune and more fits in context), and costs faster overfitting: BPE's
+  train/val gap was 0.20 per token (≈ 0.16 bpc) against char's 0.06 (≈ 0.09 bpc).
+- **BPE can't make some mistakes a char model can.** It emits `M:6/8` as one token, so it can't
+  misspell the header. Whether that shows up in the graders is a Phase C/F question.
+- **Char is simpler to inspect.** Every token is one visible character.
+
+Both stay supported; the tokenizer is one line in an experiment YAML (`tokenizer.type`), which is
+exactly the kind of choice slmkit makes cheap to compare.

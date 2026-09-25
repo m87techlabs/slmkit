@@ -15,7 +15,7 @@ walk-through of the actual code, `concepts/the-model.md` (lands with Phase B).*
 | **Family** | Llama-style: pre-norm RMSNorm, RoPE, SwiGLU, no biases, tied embeddings |
 | **Compatibility target** | Hugging Face `LlamaForCausalLM`: same parameter names and maths |
 | **Sizes** | 6 presets, **0.85M → 304M** parameters (excluding embeddings) |
-| **Vocabulary** | Per project: 67 (Shakespeare: 65 characters + 2 special tokens) · ≤1K (small BPE) · ~1,970 (chess moves) |
+| **Vocabulary** | Per project: 67 (Shakespeare: 65 characters + 2 special tokens) · 87 char or 512 BPE (ABC music) · ~1,970 (chess moves) |
 | **Context length** | 256–1,024 tokens, set per experiment |
 | **Training precision** | bf16 mixed precision (fp32 weights and optimizer, bf16 matmuls) |
 | **Resume checkpoint** | Directory of PyTorch state files; slmkit-only |

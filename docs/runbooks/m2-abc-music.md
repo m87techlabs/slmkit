@@ -6,8 +6,8 @@ Built up phase by phase, like the M1 runbook.*
 
 | Phase | Builds | Status |
 |---|---|---|
-| **A** | The ABC corpus: clean, group, transpose, header dropout | ☑ this page |
-| B | BPE tokenizer, compared with char by bits per character | ☐ |
+| **A** | The ABC corpus: clean, group, transpose, header dropout | ☑ |
+| **B** | BPE tokenizer, compared with char by bits per character | ☑ this page |
 | C | Graders, `slm eval`, `slm runs compare` | ☐ |
 | D | SFT: prompts from headers, loss on the answer only | ☐ |
 | E | Export, serve, listen on Windows | ☐ |
@@ -229,3 +229,146 @@ Listening on Windows is Phase E.
 - [x] 16,603 of 16,603 transpositions verified note-for-note with `abc2midi`.
 - [x] A `nano` model trains on it and generates recognizable, playable ABC.
 - [ ] **You** have run A.1–A.5 and the output matches.
+
+---
+
+# Phase B: BPE, and comparing tokenizers fairly
+
+*Concepts: [`../concepts/tokenization.md`](../concepts/tokenization.md) §6. Code:
+[`src/slmkit/tokenizers/bpe.py`](../../src/slmkit/tokenizers/bpe.py).*
+
+## B.0 The checks
+
+```bash
+make test                                            # 126 passed in ~8s
+uv run pytest -q tests/unit/test_bpe_tokenizer.py    # 10 passed
+```
+
+The BPE tests cover a lossless round trip on both music and English, special tokens at the same IDs
+as the char tokenizer, deterministic training, no token spanning a newline, and `<unk>` for unseen
+characters.
+
+---
+
+## B.1 Build a BPE tokenizer: one line in the experiment
+
+`experiments/bpe512.yaml` is `baseline.yaml` with one section changed:
+
+```yaml
+tokenizer:
+  type: bpe
+  vocab_size: 512
+```
+
+```bash
+uv run slm pack abc_music/bpe512
+```
+```
+abc_music/bpe512:
+  raw       exists  raw-3b076cc50c50  …
+  dataset   exists  ds-f4f721a6c0e4  …      ← the same data: only the tokenizer and packing change
+  tokenizer built   tk-53942a2f8d7a  …
+  packed    built   pk-c0bc3a003af2  …
+```
+```bash
+uv run slm lineage pk-c0bc3a003af2 | head -8
+```
+```
+pk-c0bc3a003af2  [packed]  …
+    vocab_size = 512
+    train_tokens = 1531524     ← char: 2,848,661 for the same text (both include one <eos> per tune)
+    train_docs = 11316
+    val_tokens = 57571         ← char: 107,031
+    val_docs = 419
+```
+
+**Why only the tokenizer and pack rebuild:** the dataset artifact's ID doesn't depend on the tokenizer
+config, so it is reused. Only the stages downstream of the change run, the same way Terraform only
+touches the resources a change affects.
+
+---
+
+## B.2 Look at what BPE learned
+
+```bash
+uv run python -c "
+from pathlib import Path; from slmkit.tokenizers import load_tokenizer
+t = load_tokenizer(Path.home() / 'slm/tokenizers/tk-53942a2f8d7a')
+s = 'R:jig\nM:6/8\nL:1/8\nK:G\n|:ABA AGE|(F>E)F f>dB|'
+print([t.token(i) for i in t.encode(s)])
+print(sorted((t.token(i) for i in range(2, t.vocab_size)), key=len, reverse=True)[:15])"
+```
+```
+['R:jig', '\n', 'M:6/8', '\n', 'L:1/8', '\n', 'K:G', '\n', '|:', 'AB', 'A', ' A', 'GE', '|(', 'F', '>E', ')', 'F', ' f>', 'dB|']
+['R:hornpipe', 'R:hornp', 'L:1/16', 'R:reel', 'L:1/8', 'M:6/8', 'L:1/1', 'M:2/2', 'M:2/4', 'R:ree', 'M:4/4', 'R:jig', ' A2:|', ' G2:|', ' gfed']
+```
+
+- Each header line is **one token**. The model can no longer misspell `M:6/8`.
+- A space always *leads* a token (`' A'`, `' f>'`) and never ends one: that is the GPT-2-style
+  pre-splitting, chosen after measuring three schemes (tokenization.md §6).
+- It found **phrase endings** (`' A2:|'`, `' G2:|'`) and a **scale run** (`' gfed'`) on its own,
+  purely because ABC repeats them.
+
+---
+
+## B.3 Train the A/B run
+
+```bash
+uv run slm pretrain abc_music/bpe512
+```
+
+About 25 seconds:
+
+```
+  parameters  918,656 (853,120 non-embedding + 65,536 embedding)     ← 512 × 128 embedding
+eval  step      0  train 6.1795  val 6.1846  (gap +0.0051, 4.799 bpc)  * best
+eval  step    250  train 2.7556  val 2.8440  (gap +0.0884, 2.207 bpc)  * best
+eval  step    500  train 2.3538  val 2.5123  (gap +0.1586, 1.950 bpc)  * best
+eval  step    750  train 2.1907  val 2.3850  (gap +0.1943, 1.851 bpc)  * best
+eval  step    916  train 2.1510  val 2.3531  (gap +0.2021, 1.826 bpc)  * best
+complete: 30,015,488 tokens, best val 2.3531, 0.01 GPU-h
+```
+
+Every eval line now ends with **bpc**, bits per character. The per-token loss (2.35) can't be compared
+with the char model's (1.26); bpc can.
+
+The generated jig (prompt `R:jig / M:6/8 / L:1/8 / K:G`), as well-formed as the char model's:
+
+```
+(uc/c/)|d>ed cBA|B2e BGF|Ged cBA|
+G>AA A>cB|AGG ABc|dcA AFG|c>BA A2:|
+|:(uA/B/)|cfc Acc|Bfb afd|ecA B2A|cAc fdB|
+```
+
+---
+
+## B.4 Compare the two, on the full validation split
+
+```bash
+uv run slm runs list
+uv run python scripts/val_metrics.py run-749d    # char   (use your own IDs from runs list)
+uv run python scripts/val_metrics.py run-f79b    # BPE
+```
+```
+abc-baseline (run-749d)   loss 1.2557  ppl   3.51  bpc 1.812  top1  60.8%  top5  90.8%  (vocab 87, 1.00 chars/token)
+abc-bpe512   (run-f79b)   loss 2.3504  ppl  10.49  bpc 1.824  top1  42.0%  top5  70.1%  (vocab 512, 1.86 chars/token)
+```
+
+**Read the last-but-one column first.** Loss, perplexity and accuracy are *per token*, and a BPE
+token is 1.86 characters, so BPE looks three times worse by perplexity while being essentially equal
+in bits per character: **1.812 vs 1.824**. One seed each can't separate those; the Phase F sweep runs
+three.
+
+**Why this matters beyond ABC:** comparing models across tokenizers by per-token loss or perplexity is
+one of the most common mistakes in language-model comparisons. Bits per character (or per byte) is the
+fair unit, and slmkit now reports it everywhere a loss is reported.
+
+---
+
+## Phase B: done when
+
+- [x] `make test` (126), `make test-gpu` (4) and `make lint` pass.
+- [x] `slm pack abc_music/bpe512` builds a 512-token BPE that round-trips the whole corpus losslessly.
+- [x] The trainer reports bpc on every eval; `val_metrics.py` reports it per run.
+- [x] Char vs BPE compared at equal compute: 1.812 vs 1.824 bpc.
+- [ ] **You** have run B.1–B.4 and the output matches.

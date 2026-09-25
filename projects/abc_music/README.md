@@ -87,4 +87,5 @@ adherence after SFT; n-gram novelty against the training set.
 
 | File | Model | Purpose |
 |---|---|---|
-| [`baseline.yaml`](experiments/baseline.yaml) | `nano` (0.85M), char | the first run: prove the pipeline (best val 1.2564 after 30M tokens, 0.01 GPU-h) |
+| [`baseline.yaml`](experiments/baseline.yaml) | `nano` (0.85M), char | the first run: prove the pipeline (best val 1.2564 after 30M tokens, 0.01 GPU-h; **1.812 bpc** on full validation) |
+| [`bpe512.yaml`](experiments/bpe512.yaml) | `nano`, BPE 512 | the tokenizer A/B: identical to baseline except the tokenizer (**1.824 bpc**; see [tokenization.md §6](../../docs/concepts/tokenization.md)) |
