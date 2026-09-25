@@ -75,13 +75,13 @@ Goal: prove the trainer is correct against a published result before trusting an
 
 ---
 
-## M2 — First real project: ABC music (full lifecycle) ☐
+## M2 — First real project: ABC music (full lifecycle) ◐
 
 Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export, serve.
 *~6–10 sessions, tens of GPU-hours across all sweeps.*
 
-- [ ] `projects/abc_music`: ingest TheSession dump; parse settings; `group = tune_id`.
-- [ ] Augmentation: transposition within ±2 semitones (train split only); header dropout.
+- [x] `projects/abc_music`: ingest public-domain tune books (ADR 0005; The Session's licence forbids LLM training); clean; group by melody fingerprint + title.
+- [x] Augmentation: transposition within ±2 semitones into ≤3-accidental keys (train split only, verified note-for-note with `abc2midi`); header dropout.
 - [ ] Tokenizers: `char` baseline; add `bpe.py` (HF `tokenizers`) and compare.
 - [ ] `graders/` (engine): n-gram novelty, parse-rate wrapper.
 - [ ] Project graders: bar durations vs `M:`, tonic cadence, prompt adherence.

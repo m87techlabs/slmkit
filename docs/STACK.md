@@ -457,7 +457,7 @@ Installed by `scripts/setup-ml-distro.sh`.
 | `curl` | HTTP client | Installing `uv`; poking `slm serve` | [docs](https://curl.se/docs/) |
 | `build-essential` | gcc, make, libc headers | Triton compiles a small C helper at runtime and needs a system C compiler | [package](https://packages.ubuntu.com/noble/build-essential) |
 | `python3-dev` | Python's C headers (`Python.h`) | The same Triton helper includes `Python.h`. Without it `torch.compile` fails at the first compile with `Python.h: No such file or directory`. Missed in M0 and caught by the M1 GPU tests; `slm doctor` now checks it | [package](https://packages.ubuntu.com/noble/python3-dev) |
-| `abc2midi` | Part of abcMIDI; converts ABC to MIDI | Grading ABC output and listening to it (M2) | [abcMIDI](https://abcmidi.sourceforge.io/) |
+| `abc2midi` | Part of abcMIDI; converts ABC to MIDI | The reference ABC player: the oracle that verifies every transposition note-for-note, then grading and listening (M2) | [abcMIDI](https://abcmidi.sourceforge.io/) |
 
 ---
 
@@ -468,9 +468,9 @@ the engine never imports a project library.
 
 | Item | Project | What it is | Why | Docs |
 |---|---|---|---|---|
-| **music21** | ABC (M2) | Toolkit for analysing music notation | Parse generated ABC; check meters, keys and cadences in graders | [docs](https://www.music21.org/music21docs/) |
+| **music21** | ABC (M2) | Toolkit for analysing music notation (BSD-3-Clause) | Ships the public-domain ABC tune books slmkit trains on; MIDI reading in tests. **Not** used to judge ABC pitch: it doesn't carry accidentals through a bar as the ABC standard requires (data-preparation.md §4) | [docs](https://www.music21.org/music21docs/) |
 | **ABC notation** | ABC (M2) | Plain-text melody format | The corpus *and* the model's output language | [standard](https://abcnotation.com/wiki/abc:standard) |
-| **TheSession data** | ABC (M2) | Dump of ~45k folk tunes | Training corpus; `tune_id` is the split group | [repo](https://github.com/adactio/TheSession-data) |
+| **Public-domain tune books** | ABC (M2) | Ryan's Mammoth (1883), O'Neill's (1903), Aird's (1778–1803), as ABC in `music21` | Training corpus, 4,248 tunes | [ADR 0005](decisions/0005-abc-data-source.md) |
 | **python-chess** | Chess (M3) | Move generation, PGN parsing, legality | Legal-move grader and legal-move-masked decoding | [docs](https://python-chess.readthedocs.io/) |
 | **Stockfish** | Chess (M3) | Strongest open-source chess engine | Fixed-strength opponent to measure Elo | [site](https://stockfishchess.org/) |
 | **Lichess database** | Chess (M3) | Monthly game dumps + puzzle DB | Effectively unlimited games; puzzles as an eval set (with their source games excluded from training) | [database](https://database.lichess.org/) |
@@ -522,6 +522,7 @@ Recorded here because "why not X?" is often the most useful question.
 
 | Tool | What it would give | Why not |
 |---|---|---|
+| The Session's data dump | ~45K ABC tunes, the obvious corpus | Its licence prohibits training language models on it, including privately (ADR 0005) |
 | HF `Trainer`, PyTorch Lightning, Accelerate | A ready-made training loop | The training loop is what slmkit exists to teach. Hiding it defeats the purpose (rule 6) |
 | DeepSpeed, FSDP, DDP | Multi-GPU and sharded training | One GPU, one process (rule 7); models fit easily |
 | Hydra | Config composition | The same merge in about 50 lines, without a framework's conventions |

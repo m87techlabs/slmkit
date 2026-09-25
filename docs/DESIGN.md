@@ -229,14 +229,17 @@ matching curve shape** as the pass mark. A Llama-style model should land at or s
 
 ### 5.1 `abc_music` — first real project
 
-- **Data:** thesession.org dump (`adactio/TheSession-data`), ~45K tunes with multiple settings
-  each, roughly 5–20M characters.
+- **Data:** ABC transcriptions of three public-domain tune books shipped in `music21` (Ryan's
+  Mammoth 1883, O'Neill's 1903, Aird's 1778–1803): 4,248 tunes, ~1.1M characters. The
+  originally planned thesession.org dump is **not used**: its licence prohibits training language
+  models on it (ADR 0005).
 - **Model size:** **1–5M params**, character-level or small BPE (≤1K vocab), dropout 0.1–0.2,
   early stopping. Beyond ~4 epochs repeated data loses value quickly; past ~16 epochs it is
   mostly memorization.
-- **Split by tune ID** (the `group`), never by setting. Near-duplicate settings otherwise leak
-  into validation and hide memorization. This is the single most important correctness detail
-  in the project.
+- **Split by tune identity** (the `group`), never by setting. Near-duplicate settings otherwise
+  leak into validation and hide memorization. This is the single most important correctness
+  detail in the project. With no shared tune ID across books, the group is a melody fingerprint
+  joined with distinctive titles (`concepts/data-preparation.md` §2).
 - **Augmentation (train split only, after splitting):** transpose within ±2 semitones or to the
   genre's common keys (D, G, A, C, Em, Bm, Am). Not all 12: a D♭ reel is out of distribution.
   Expect ~1.5–2× effective data, not 12×.

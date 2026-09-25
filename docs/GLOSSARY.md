@@ -243,6 +243,12 @@ a corpus is small relative to the model.
 **Leakage.** When information from validation reaches training — usually via near-duplicates
 landing on both sides of the split. It makes results look great and mean nothing.
 
+**Near-duplicate.** Two examples that are the same thing in slightly different form (two settings of
+one tune, the same tune in two books). They must share a split group, or validation leaks.
+
+**Oracle (testing).** An independent implementation used as the judge of whether your output is right.
+slmkit uses `abc2midi` as the oracle for ABC transposition.
+
 **Group split.** Splitting by a key that keeps all variants of one thing together (all settings
 of a tune, all positions from a game) instead of splitting individual documents. slmkit's
 `Doc.group` field exists solely for this.
@@ -512,6 +518,12 @@ over however many sessions it takes.
 
 **ABC notation.** A plain-text format for melodies, widely used for folk and traditional music.
 Header lines carry metadata (`R:` rhythm, `M:` meter, `K:` key) and the body carries notes.
+
+**Semitone / transposition.** A semitone is the smallest step in Western music (one piano key).
+Transposing moves every note of a tune by the same number of semitones: same melody, different key.
+
+**Header dropout.** Removing some header lines (`R:`, `M:`, `K:`) from a fraction of training tunes
+so the model learns to write tunes both with and without being told their rhythm, meter or key.
 
 **PGN — Portable Game Notation.** The standard text format for recorded chess games.
 
