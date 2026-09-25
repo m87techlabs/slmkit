@@ -312,8 +312,10 @@ def runs_list() -> None:
               f"{'BEST VAL':>8}  {'LAST CHECKPOINT':<22} STATUS")  # fmt: skip
     typer.echo(header)
     for _, st in rows:
-        done = st["tokens_seen"] / st["max_tokens"]
+        # The last step can overshoot the budget by part of a step: show 100%, not 100.1%.
+        done = min(1.0, st["tokens_seen"] / st["max_tokens"])
         left = st.get("gpu_hours_remaining")
+        left = None if left is None else max(0.0, left)
         ck = st.get("last_checkpoint") or {}
         ckpt = f"step {ck['step']} · {_ago(ck.get('time'))}" if ck else "none yet"
         best = st.get("best_val_loss")
