@@ -32,8 +32,9 @@ import torch
 
 from slmkit import artifacts, pipeline
 from slmkit.config.load import Experiment
-from slmkit.data.pack import open_packed
+from slmkit.data.pack import count_chars, open_packed
 from slmkit.data.sampler import RandomWindowSampler
+from slmkit.data.split import read_docs
 from slmkit.model import CausalLM, ModelArgs, count_parameters, flops_per_token
 from slmkit.model.stats import PLANNING_TFLOPS
 from slmkit.project_api import Project
@@ -92,6 +93,12 @@ class Trainer:
 
         self.train_data = open_packed(packed.path / "train.bin")
         self.val_data = open_packed(packed.path / "val.bin")
+        # Characters per validation token: turns per-token loss into bits per character, the
+        # one number comparable across tokenizers.
+        val_docs = read_docs(pipeline.ensure_dataset(exp).path / "val.jsonl")
+        self.val_chars_per_token = count_chars(val_docs, append_eos=cfg.data.append_eos) / max(
+            1, len(self.val_data)
+        )
         self.args = ModelArgs.from_config(cfg.model, self.tokenizer.vocab_size, cfg.data.block_size)
         self.tokens_per_step = cfg.train.batch_size * cfg.data.block_size * cfg.train.grad_accum
 
@@ -278,12 +285,14 @@ class Trainer:
         train = self.estimate_loss(self.train_data)
         self.last_val = val
         improved = val < self.best_val
+        bpc = val / self.val_chars_per_token / math.log(2)
         self.log(
             f"eval  step {self.step:>6}  train {train:.4f}  val {val:.4f}  "
-            f"(gap {val - train:+.4f}){'  * best' if improved else ''}  "
+            f"(gap {val - train:+.4f}, {bpc:.3f} bpc){'  * best' if improved else ''}  "
             f"[{time.perf_counter() - t0:.1f}s]"
         )
         self.tracker.scalar("loss/val", val, self.step)
+        self.tracker.scalar("bpc/val", bpc, self.step)
         self.tracker.scalar("loss/train_eval", train, self.step)
         samples = self.samples()
         for name, text in samples:
@@ -291,7 +300,7 @@ class Trainer:
             self.log(text.rstrip())
             self.tracker.text(f"samples/{name}", text, self.step)
         self.log("─" * 72)
-        self._metric({"kind": "eval", "val_loss": val, "train_loss": train,
+        self._metric({"kind": "eval", "val_loss": val, "train_loss": train, "val_bpc": bpc,
                       "samples": dict(samples)})  # fmt: skip
         if improved:
             self.best_val = val

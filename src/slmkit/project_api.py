@@ -54,7 +54,12 @@ class EvalPrompt:
 
 @dataclass(frozen=True)
 class TokenizerSpec:
-    """What kind of tokenizer a project needs. The experiment's `tokenizer.type` must match."""
+    """What kind of tokenizer a project needs.
+
+    `char` or `bpe`: the project's documents are text, and each experiment chooses either
+    (`tokenizer.type`), because that choice is a hyperparameter worth comparing. `fixed`: the
+    project defines the complete vocabulary itself (`tokens`), e.g. every legal chess move.
+    """
 
     type: Literal["char", "bpe", "fixed"]
     vocab_size: int | None = None  # bpe

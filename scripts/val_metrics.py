@@ -5,7 +5,9 @@
 The trainer's eval samples random windows, which is quick and good enough to pick the best
 checkpoint. This does one exact pass instead: the validation text cut into consecutive,
 non-overlapping windows, every token scored once. It reports the metrics explained in
-docs/concepts/metrics.md, plus two baselines that need no model at all.
+docs/concepts/metrics.md, plus a baseline that needs no model at all (token frequencies).
+Loss, perplexity and accuracy are per token; bits per character (bpc) divides by characters
+instead, so runs with different tokenizers can be compared.
 
 A stop-gap until M2's `slm eval`, which will run project graders over generated samples.
 """
@@ -20,20 +22,27 @@ import torch
 
 from slmkit import artifacts
 from slmkit.config.schema import ModelConfig
-from slmkit.data.pack import open_packed
+from slmkit.data.pack import count_chars, open_packed
+from slmkit.data.split import read_docs
 from slmkit.model import CausalLM, ModelArgs
 from slmkit.tokenizers import load_tokenizer
 from slmkit.train.run import load_run_config, runs_root
 
 
-def baselines(train: np.ndarray, val: np.ndarray, vocab: int) -> None:
+def chars_per_token(packed_dir: object, val_tokens: int, append_eos: bool) -> float:
+    """Validation characters per token, to turn per-token loss into bits per character."""
+    dataset = artifacts.find_artifact(artifacts.read_manifest(packed_dir)["inputs"]["dataset"])  # type: ignore[arg-type]
+    return count_chars(read_docs(dataset / "val.jsonl"), append_eos=append_eos) / val_tokens
+
+
+def baselines(train: np.ndarray, val: np.ndarray, vocab: int, cpt: float) -> None:
     counts = np.bincount(train, minlength=vocab)
     targets = val[1:]
     ranked = counts.argsort()[::-1]
     probs = counts / counts.sum()
     loss = float(-np.log(probs[targets] + 1e-12).mean())
-    print(f"{'baseline: letter frequencies':34s} loss {loss:.4f}  ppl {math.exp(loss):6.2f}  "
-          f"bpc {loss / math.log(2):.3f}  top1 {(targets == ranked[0]).mean():6.1%}  "
+    print(f"{'baseline: token frequencies':34s} loss {loss:.4f}  ppl {math.exp(loss):6.2f}  "
+          f"bpc {loss / cpt / math.log(2):.3f}  top1 {(targets == ranked[0]).mean():6.1%}  "
           f"top5 {np.isin(targets, ranked[:5]).mean():6.1%}")  # fmt: skip
 
 
@@ -43,7 +52,9 @@ def score(run_prefix: str, device: torch.device) -> None:
     cfg = load_run_config(run_dir)
     inputs = artifacts.read_manifest(run_dir)["inputs"]
     tokenizer = load_tokenizer(artifacts.find_artifact(inputs["tokenizer"]))
-    val = np.asarray(open_packed(artifacts.find_artifact(inputs["packed"]) / "val.bin"), np.int64)
+    packed_dir = artifacts.find_artifact(inputs["packed"])
+    val = np.asarray(open_packed(packed_dir / "val.bin"), np.int64)
+    cpt = chars_per_token(packed_dir, len(val), cfg["data"]["append_eos"])
     block = cfg["data"]["block_size"]
     args = ModelArgs.from_config(
         ModelConfig.model_validate(cfg["model"]), tokenizer.vocab_size, block
@@ -67,8 +78,9 @@ def score(run_prefix: str, device: torch.device) -> None:
     total = n * block
     loss = sum(losses) / total
     print(f"{cfg['run']['name'] + ' (' + run_dir.name[:8] + ')':34s} loss {loss:.4f}  "
-          f"ppl {math.exp(loss):6.2f}  bpc {loss / math.log(2):.3f}  "
-          f"top1 {sum(top1) / total:6.1%}  top5 {sum(top5) / total:6.1%}")  # fmt: skip
+          f"ppl {math.exp(loss):6.2f}  bpc {loss / cpt / math.log(2):.3f}  "
+          f"top1 {sum(top1) / total:6.1%}  top5 {sum(top5) / total:6.1%}  "
+          f"(vocab {tokenizer.vocab_size}, {cpt:.2f} chars/token)")  # fmt: skip
 
 
 def main() -> None:
@@ -79,8 +91,10 @@ def main() -> None:
     inputs = artifacts.read_manifest(first)["inputs"]
     packed = artifacts.find_artifact(inputs["packed"])
     vocab = load_tokenizer(artifacts.find_artifact(inputs["tokenizer"])).vocab_size
-    baselines(np.asarray(open_packed(packed / "train.bin")),
-              np.asarray(open_packed(packed / "val.bin"), np.int64), vocab)  # fmt: skip
+    val = np.asarray(open_packed(packed / "val.bin"), np.int64)
+    cfg = load_run_config(first)
+    cpt = chars_per_token(packed, len(val), cfg["data"]["append_eos"])
+    baselines(np.asarray(open_packed(packed / "train.bin")), val, vocab, cpt)
     for prefix in sys.argv[1:]:
         score(prefix, device)
 

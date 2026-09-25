@@ -1,0 +1,36 @@
+# The tokenizer A/B: identical to baseline.yaml except `tokenizer`. Same model, data, context
+# (512 tokens), batch and token budget, so the same compute; compare the two in bits per character.
+run:
+  name: abc-bpe512
+  seed: 1337
+  tracker: tensorboard
+project:
+  name: abc_music
+  args:
+    transpose_semitones: [-2, -1, 1, 2]
+    max_key_accidentals: 3
+    header_dropout: 0.4
+tokenizer:
+  type: bpe
+  vocab_size: 512           # DESIGN 5.1: small BPE (<= 1K); ~1.9 characters per token on this corpus
+data:
+  block_size: 512           # 512 tokens is ~950 characters: usually two or more whole tunes
+  val_fraction: 0.1
+  append_eos: true
+model:
+  preset: nano
+  overrides: {dropout: 0.1}
+train:
+  preset: default
+  max_tokens: 30_000_000    # same compute as baseline; ~1.9x as much text, so more passes
+  batch_size: 64
+  lr: 1.0e-3
+  warmup_tokens: 1_000_000
+  eval_every_steps: 250
+  eval_iters: 50
+  eval_samples: 2
+  sample_tokens: 200        # ~380 characters, like baseline's 400 char tokens
+eval:
+  num_samples: 200
+  seeds: [0, 1, 2]
+  temperature: 0.8

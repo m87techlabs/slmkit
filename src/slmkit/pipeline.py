@@ -24,7 +24,7 @@ from slmkit.data.pack import DTYPE, pack_split
 from slmkit.data.split import SPLITS, read_docs, split_documents, write_docs
 from slmkit.project_api import Project
 from slmkit.registry import load_project
-from slmkit.tokenizers import CharTokenizer, Tokenizer, load_tokenizer
+from slmkit.tokenizers import BPETokenizer, CharTokenizer, Tokenizer, load_tokenizer
 
 CODE_VERSION = {"raw": 1, "dataset": 1, "tokenizer": 1, "packed": 1}
 
@@ -147,15 +147,22 @@ def ensure_dataset(exp: Experiment, log: Log = _noop) -> StageResult:
 
 
 def _train_tokenizer(exp: Experiment, project: Project, dataset: Path) -> Tokenizer:
+    """Fit on the train split only. Text projects may use `char` or `bpe`, chosen per
+    experiment; a `fixed` vocabulary is defined by the project and can't be swapped."""
     spec = project.tokenizer_spec()
-    wanted = exp.config.tokenizer.type
-    if spec.type != wanted:
+    cfg = exp.config.tokenizer
+    if (spec.type == "fixed") != (cfg.type == "fixed"):
         raise ValueError(
-            f"experiment asks for a {wanted!r} tokenizer; project supports {spec.type!r}"
+            f"experiment asks for a {cfg.type!r} tokenizer; project needs {spec.type!r}"
         )
-    if wanted == "char":
-        return CharTokenizer.train(doc.text for doc in read_docs(dataset / "train.jsonl"))
-    raise NotImplementedError(f"tokenizer type {wanted!r} arrives in a later milestone")
+    texts = (doc.text for doc in read_docs(dataset / "train.jsonl"))
+    if cfg.type == "char":
+        return CharTokenizer.train(texts)
+    if cfg.type == "bpe":
+        if cfg.vocab_size is None:
+            raise ValueError("tokenizer.type bpe needs tokenizer.vocab_size")
+        return BPETokenizer.train(texts, cfg.vocab_size)
+    raise NotImplementedError(f"tokenizer type {cfg.type!r} arrives in a later milestone")
 
 
 def ensure_tokenizer(exp: Experiment, log: Log = _noop) -> StageResult:

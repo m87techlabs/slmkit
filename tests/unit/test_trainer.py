@@ -84,6 +84,7 @@ def test_loss_falls_and_samples_are_printed(toy_repo: Path, slm_home: Path) -> N
     losses = _train_losses(trainer.run_dir)
     assert losses[100] < losses[1] - 1.0
     assert any("sample @ step 0" in line for line in log)  # the untrained baseline
+    assert any(line.startswith("eval") and " bpc)" in line for line in log)
     assert any("sample @ step 100" in line for line in log)
     for name in ("config.resolved.yaml", "manifest.json", "status.json", "train.log"):
         assert (trainer.run_dir / name).is_file()

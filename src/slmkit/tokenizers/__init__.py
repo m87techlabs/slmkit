@@ -6,20 +6,24 @@ import json
 from pathlib import Path
 
 from slmkit.tokenizers.base import EOS_ID, SPECIALS, TOKENIZER_FILE, UNK_ID, Tokenizer
+from slmkit.tokenizers.bpe import BPETokenizer
 from slmkit.tokenizers.char import CharTokenizer
 
 
 def load_tokenizer(directory: Path) -> Tokenizer:
-    kind = json.loads((directory / TOKENIZER_FILE).read_text()).get("type")
-    if kind == "char":
+    data = json.loads((directory / TOKENIZER_FILE).read_text())
+    if data.get("type") == "char":
         return CharTokenizer.load(directory)
-    raise NotImplementedError(f"tokenizer type {kind!r} arrives in a later milestone")
+    if data.get("model", {}).get("type") == "BPE":  # Hugging Face's tokenizer.json format
+        return BPETokenizer.load(directory)
+    raise NotImplementedError(f"unrecognised tokenizer in {directory}")
 
 
 __all__ = [
     "EOS_ID",
     "SPECIALS",
     "UNK_ID",
+    "BPETokenizer",
     "CharTokenizer",
     "Tokenizer",
     "load_tokenizer",

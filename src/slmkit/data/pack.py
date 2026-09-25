@@ -46,3 +46,14 @@ def pack_split(
 def open_packed(path: Path) -> np.memmap:
     """Map a packed split read-only. Nothing is loaded until a window is actually read."""
     return np.memmap(path, dtype=DTYPE, mode="r")
+
+
+def count_chars(docs: Iterable[Doc], *, append_eos: bool) -> int:
+    """Characters in a split as the model sees them: every document's text, plus one per
+    document for <eos> when it is appended.
+
+    Loss is measured per *token*, and a BPE token covers several characters, so per-token losses
+    from different tokenizers can't be compared. Dividing total loss by this count instead gives
+    bits per character (docs/concepts/metrics.md), which can.
+    """
+    return sum(len(d.text) + (1 if append_eos else 0) for d in docs)
