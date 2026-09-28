@@ -7,8 +7,8 @@ Built up phase by phase, like the M1 runbook.*
 | Phase | Builds | Status |
 |---|---|---|
 | **A** | The ABC corpus: clean, group, transpose, header dropout | ☑ |
-| **B** | BPE tokenizer, compared with char by bits per character | ☑ this page |
-| C | Graders, `slm eval`, `slm runs compare` | ☐ |
+| **B** | BPE tokenizer, compared with char by bits per character | ☑ |
+| **C** | Graders, `slm eval`, `slm runs compare` | ☑ this page |
 | D | SFT: prompts from headers, loss on the answer only | ☐ |
 | E | Export, serve, listen on Windows | ☐ |
 | F | Sweeps, exit criteria | ☐ |
@@ -372,3 +372,159 @@ fair unit, and slmkit now reports it everywhere a loss is reported.
 - [x] The trainer reports bpc on every eval; `val_metrics.py` reports it per run.
 - [x] Char vs BPE compared at equal compute: 1.812 vs 1.824 bpc.
 - [ ] **You** have run B.1–B.4 and the output matches.
+
+---
+
+# Phase C: graders and `slm eval`
+
+*Concepts: [`../concepts/evaluation.md`](../concepts/evaluation.md). Code:
+[`src/slmkit/eval/runner.py`](../../src/slmkit/eval/runner.py),
+[`src/slmkit/graders/`](../../src/slmkit/graders/),
+[`projects/abc_music/graders.py`](../../projects/abc_music/graders.py).*
+
+## C.0 The checks
+
+```bash
+make test                                                                      # 151 passed in ~10s
+uv run pytest -q tests/unit/test_eval.py projects/abc_music/tests/test_graders.py   # 25 passed
+make test-gpu                                                                  # 4 passed
+```
+
+The grader tests use hand-made tunes whose correct scores are known: a well-formed jig scores
+1/1/1, a tune with two over-long bars scores exactly ⅓ on bars (the pickup and its completion
+aren't judged), a jig in G ending on D scores 0 on tonic, and garbage doesn't play.
+
+---
+
+## C.1 Grade the graders first
+
+A grader is only trustworthy if real, human-written tunes score near the top. The calibration
+test runs the bar and tonic graders over every tenth corpus tune:
+
+```bash
+uv run pytest -q projects/abc_music/tests/test_graders.py -k human_corpus
+```
+
+Over the whole corpus: **bar_accuracy 0.990** (92.9% of tunes perfect) and **80.5% end on the
+tonic**, because real tunes often end on the third or fifth. So 0.8 is the target for
+`ends_on_tonic`, not 1.0. The handful of corpus tunes scoring 0 on bars have wrong headers in the
+source files: O'Neill's #316 says 3/4, but every bar holds eight eighth notes. The grader was right.
+
+**Why:** a grader bug looks exactly like a model weakness. Calibrating on known-good data is the
+only way to tell them apart. See evaluation.md §3.
+
+---
+
+## C.2 Evaluate a model
+
+```bash
+uv run slm eval run-749d          # your char baseline run (IDs from `slm runs list`)
+```
+```
+run-749d028accd4 (abc-baseline) · best · step 916 · 3 seeds × 200 samples
+  model    seed 0: ended 0.920  length 280.840  plays 0.615  bar_accuracy 0.686  ends_on_tonic 0.240  novelty 0.998
+  …
+metric                       model    baseline (token frequencies)
+ended                0.920 ± 0.005                   0.923 ± 0.018
+length             279.462 ± 6.439                215.237 ± 23.074
+plays                0.643 ± 0.025                   0.063 ± 0.018
+bar_accuracy         0.677 ± 0.011                   0.047 ± 0.012
+ends_on_tonic        0.188 ± 0.058                   0.152 ± 0.006
+novelty              0.999 ± 0.000                   1.000 ± 0.000
+
+report: ~/slm/runs/run-749d028accd4/eval/ev-a844801d43.json
+```
+
+About 25 seconds on the GPU: 600 samples from the model, 600 from the baseline, every one graded.
+
+**Read it against the baseline column,** which is tokens drawn at random by training frequency:
+
+- `plays` and `bar_accuracy` are 10× and 14× the baseline: real learning.
+- `ended` matches the baseline for a trivial reason: random draws hit `<eos>` within 600 tokens ~91%
+  of the time. On its own it says nothing.
+- `novelty` is ~1.0 for random text too: a guard against copying, not a score.
+- `ends_on_tonic` barely beats the baseline's ~1-in-7 (C.4).
+
+**Run it again** and you get `ev-a844801d43 already exists`: the report ID hashes the settings, the
+checkpoint and the graders' source code, so identical evaluations are reused, and a changed grader
+automatically forces a fresh one. Same seeds also give identical numbers: evaluation is reproducible.
+
+---
+
+## C.3 Compare runs side by side
+
+```bash
+uv run slm eval run-f79b                       # the BPE run
+uv run slm runs compare run-749d run-f79b
+```
+```
+run                          run-749d028a             run-f79bc951
+name                         abc-baseline               abc-bpe512
+tokenizer                            char                  bpe 512
+best val loss                      1.2564                   2.3531
+best val bpc                            -                    1.826
+eval              ev-a844801d43 (3 seeds)  ev-a844801d43 (3 seeds)
+plays                       0.643 ± 0.025            0.505 ± 0.005
+bar_accuracy                0.677 ± 0.011            0.728 ± 0.007
+ends_on_tonic               0.188 ± 0.058            0.203 ± 0.043
+novelty                     0.999 ± 0.000            0.985 ± 0.004
+…
+```
+
+(The char run shows `-` for bpc only because it was trained before the trainer reported bpc; its
+full-validation figure is 1.812.)
+
+Bits per character called char and BPE a tie. The graders show a trade-off: char plays more often,
+BPE gets more bars right, and BPE copies slightly more (1.5% of 32-character windows). Each gap is
+several times the sampling spread. Whether it survives different *training* seeds is Phase F's
+question.
+
+---
+
+## C.4 Investigate a suspicious number: ends on the tonic
+
+A 19% tonic rate against 80% for real tunes looked like a possible grader bug, so the endings were
+counted directly (80 samples of the char model):
+
+```
+reel-D      [('ended D', 5), ('ended A', 4), ('ended F#', 4), ('ended G', 2), ('ended E', 2), ('cut   G', 1)]
+jig-G       [('ended G', 8), ('ended A', 4), ('ended C', 3), ('ended E', 2), ('cut   C', 1), ('ended D', 1)]
+hornpipe-A  [('ended E', 5), ('ended F#', 4), ('ended A', 3), ('ended G#', 3), ('ended C#', 2), ('ended D', 2)]
+air-Em      [('ended G', 4), ('ended E', 3), ('ended D', 3), ('ended F#', 2), ('cut   C', 2), ('ended A', 1)]
+```
+
+76 of 80 finished on their own, and the grader scores each correctly. **It's a real weakness:** a
+0.86M-parameter model learns local rules (bar lengths) much better than a long-range one (end on the
+key stated at the top).
+
+The trap along the way: every ending above is a note of the key, which suggested "it knows the key,
+just not to come home". An `ends_in_key` grader scored the model 0.997, and random characters 0.987.
+In ABC, the key signature makes almost any bare note in-key, so the metric measured the notation, not
+the model. It was removed. The baseline column is what caught it (evaluation.md §5).
+
+---
+
+## C.5 Why samples fail to play
+
+Of 200 samples, 77 (char) and 101 (BPE) don't play. The `abc2midi` errors behind them are grammar
+slips, not garbage:
+
+| Cause | Char | BPE |
+|---|---|---|
+| broken rhythm (`>`) between notes of unequal length | 33 | 45 |
+| malformed note (e.g. an accidental with no note after it) | 23 | 40 |
+| a repeat opened but never closed | 24 | 24 |
+| a tie to nothing | 13 | 14 |
+
+`plays` is strict: any `Error` line fails the sample, even ones `abc2midi` recovers from.
+
+---
+
+## Phase C: done when
+
+- [x] `make test` (151), `make test-gpu` (4) and `make lint` pass.
+- [x] Graders calibrated on the human corpus (bars 0.990, tonic 80.5%).
+- [x] `slm eval` reports 3 seeds × 200 samples, mean ± spread, next to a no-model baseline.
+- [x] `slm runs compare` shows config, training result and eval side by side.
+- [x] Both models beat the baseline on `plays` and `bar_accuracy`; the tonic weakness is explained.
+- [ ] **You** have run C.1–C.3 and the output matches.

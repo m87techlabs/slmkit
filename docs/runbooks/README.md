@@ -23,4 +23,4 @@ must match exactly and which are only ballpark figures.
 |---|---|---|
 | [`m0-environment.md`](m0-environment.md) | M0 | ☑ |
 | [`m1-engine.md`](m1-engine.md) | M1 | ☑ |
-| [`m2-abc-music.md`](m2-abc-music.md) | M2 | ◐ Phase B |
+| [`m2-abc-music.md`](m2-abc-music.md) | M2 | ◐ Phase C |

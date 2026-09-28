@@ -356,6 +356,16 @@ in the target's own units. Regression metrics.
 **Calibration.** Whether predicted probabilities match reality: of everything forecast at 30%, did
 about 30% happen? **Log-loss** and the **Brier score** measure it.
 
+**Baseline (evaluation).** The score of something that knows nothing, reported beside the model's.
+slmkit's: tokens drawn at random by training frequency. A model must beat it, and a metric it matches
+for a trivial reason measures nothing.
+
+**Calibrating a grader.** Running it on data known to be good (the human-written corpus) first. If
+real examples don't score near the top, the grader is wrong.
+
+**Sampling seed vs training seed.** A sampling seed changes which samples one model draws (noise in
+the measurement); a training seed changes the model itself (noise in the result). slmkit reports both.
+
 **Held-out.** Data the model never trained on.
 
 **Elo.** A relative skill rating from head-to-head games. Used for the chess project by playing
@@ -533,6 +543,11 @@ Transposing moves every note of a tune by the same number of semitones: same mel
 
 **Header dropout.** Removing some header lines (`R:`, `M:`, `K:`) from a fraction of training tunes
 so the model learns to write tunes both with and without being told their rhythm, meter or key.
+
+**Pickup (anacrusis).** A tune starting on an upbeat: a short first bar, completed by a short last
+bar. The bar grader doesn't judge those.
+
+**Tonic.** A key's home note (G in G major, E in E minor). Tunes usually end on it.
 
 **PGN — Portable Game Notation.** The standard text format for recorded chess games.
 

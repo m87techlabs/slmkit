@@ -83,10 +83,10 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 - [x] `projects/abc_music`: ingest public-domain tune books (ADR 0005; The Session's licence forbids LLM training); clean; group by melody fingerprint + title.
 - [x] Augmentation: transposition within ±2 semitones into ≤3-accidental keys (train split only, verified note-for-note with `abc2midi`); header dropout.
 - [x] Tokenizers: `char` baseline; add `bpe.py` (HF `tokenizers`) and compare: 1.812 vs 1.824 bpc at equal compute, one seed each (tokenization.md §6); the 3-seed comparison is in the Phase F sweep.
-- [ ] `graders/` (engine): n-gram novelty, parse-rate wrapper.
-- [ ] Project graders: bar durations vs `M:`, tonic cadence, prompt adherence.
+- [x] `graders/` (engine): n-gram novelty, parse-rate wrapper.
+- [x] Project graders: plays in `abc2midi`, bar durations vs the requested `M:`, ends on the requested tonic (prompt adherence via `EvalPrompt.meta`); calibrated on the human corpus (evaluation.md §3).
 - [ ] SFT: prompt templates, prompt-token loss masking, plus a unit test.
-- [ ] `eval/` runner with multi-seed aggregation; `slm runs compare`.
+- [x] `eval/` runner with multi-seed aggregation and a no-model baseline; `slm runs compare`.
 - [ ] `export/hf.py` plus the HF parity test; `MODEL_CARD.md` generation.
 - [ ] `serve/app.py` (FastAPI `/generate`).
 - [ ] `export --to-windows` for MIDI (abc2midi) so you can listen on Windows.
