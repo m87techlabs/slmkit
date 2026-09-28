@@ -16,6 +16,7 @@ import hashlib
 import itertools
 import re
 from dataclasses import dataclass, field
+from fractions import Fraction
 
 # ------------------------------------------------------------------------------------------ keys
 
@@ -382,3 +383,168 @@ def transpose(tune: Tune, semitones: int) -> Tune:
         changes_mid_tune=False,
         extra={**tune.extra, "transposed": str(semitones)},
     )
+
+
+# ---------------------------------------------------------------------------------- measurement
+#
+# Used by the graders (graders.py). A small scanner for the subset of ABC these tunes use:
+# note lengths, broken rhythm (> <), tuplets, chords, grace notes (which take no time), rests,
+# and bar lines. It is calibrated against the human-transcribed corpus (check_corpus.py): if
+# real tunes don't score near-perfectly, the scanner is wrong, not the tunes.
+
+
+_BAR = re.compile(r"(\[\||\|\]|:*\|+:*|::)(\d+)?")
+_LENGTH = re.compile(r"(\d*)(/*)(\d*)")
+# Default q for a tuplet (p: p notes in the time of q), per the ABC standard (simple meters).
+_TUPLET_Q = {2: 3, 3: 2, 4: 3, 6: 2, 8: 3}
+
+
+def _length(text: str, pos: int) -> tuple[Fraction, int]:
+    m = _LENGTH.match(text, pos)
+    assert m is not None
+    num_s, slashes, den_s = m.groups()
+    num = int(num_s) if num_s else 1
+    if not slashes:
+        return Fraction(num), m.end()
+    den = int(den_s) if den_s else 2 ** len(slashes)
+    return Fraction(num, den), m.end()
+
+
+def meter_units(meter: str, unit: str) -> Fraction | None:
+    """Length of one bar in units of L: 6/8 with L:1/8 is 6; 2/2 with L:1/8 is 8."""
+    try:
+        m_num, m_den = (int(x) for x in normalise_meter(meter).split("/"))
+        l_num, l_den = (int(x) for x in unit.split("/"))
+    except ValueError:
+        return None
+    return Fraction(m_num, m_den) / Fraction(l_num, l_den)
+
+
+@dataclass
+class Bar:
+    units: Fraction
+    opens_section: bool  # first bar of the tune or right after a repeat / double bar
+    closes_section: bool  # last bar of the tune or right before one
+
+
+def bars(tune: Tune) -> list[Bar]:
+    """Split the body into bars and add up each bar's duration in units of L."""
+    text = re.sub(r"\{[^}]*\}", "", _strip_non_notes(tune.body))  # grace notes take no time
+    text = re.sub(r"\[\d", "|", text)  # "[1" / "[2" repeat endings behave like bar lines
+    found: list[tuple[Fraction, bool]] = []  # (duration, boundary after it)
+    current = Fraction(0)
+    last_note: Fraction | None = None  # the previous note's length, for broken rhythm
+    broken_next = Fraction(1)
+    tuplet_left, tuplet_ratio = 0, Fraction(1)
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        bar = _BAR.match(text, i)
+        if bar and ("|" in bar.group(1) or bar.group(1) == "::"):
+            boundary = bar.group(1) not in ("|",)
+            found.append((current, boundary))
+            current, last_note = Fraction(0), None
+            i = bar.end()
+            continue
+        if ch == "(" and i + 1 < len(text) and text[i + 1].isdigit():
+            m = re.match(r"\((\d)(?::(\d)?)?(?::(\d))?", text[i:])
+            assert m is not None
+            p = int(m.group(1))
+            q = int(m.group(2)) if m.group(2) else _TUPLET_Q.get(p, 2)
+            tuplet_left, tuplet_ratio = int(m.group(3) or p), Fraction(q, p)
+            i += m.end()
+            continue
+        if ch in "><":
+            n = len(re.match(r"[<>]+", text[i:]).group(0))  # type: ignore[union-attr]
+            shift = Fraction(1, 2**n)
+            long_, short = 2 - shift, shift
+            first, second = (long_, short) if ch == ">" else (short, long_)
+            if last_note is not None:
+                current += last_note * (first - 1)
+            broken_next = second
+            i += n
+            continue
+        chord = ch == "[" and text[i + 1 : i + 2] not in ("", "|")
+        if chord:
+            end = text.find("]", i)
+            if end == -1:
+                break
+            inner = _NOTE.search(text, i + 1, end)
+            base, _ = _length(text, inner.end()) if inner else (Fraction(1), 0)
+            mult, j = _length(text, end + 1)
+            duration, i = base * mult, j
+        elif m := _NOTE.match(text, i):
+            duration, i = _length(text, m.end())
+        elif ch in "zx":
+            duration, i = _length(text, i + 1)
+        else:
+            i += 1
+            continue
+        duration *= broken_next
+        broken_next = Fraction(1)
+        if tuplet_left:
+            duration *= tuplet_ratio
+            tuplet_left -= 1
+        current += duration
+        last_note = duration
+    if current:
+        found.append((current, True))
+    out = []
+    for k, (units, boundary_after) in enumerate(found):
+        opens = k == 0 or found[k - 1][1]
+        out.append(Bar(units, opens_section=opens, closes_section=boundary_after))
+    return [b for b in out if b.units > 0]
+
+
+def bar_accuracy(tune: Tune, meter: str | None = None) -> float | None:
+    """Fraction of bars whose length matches the meter.
+
+    A short bar at the start or end of a section is a pickup (anacrusis): the tune starts on an
+    upbeat, and the missing time is made up at the section's end. Those are not counted either
+    way. Every other bar must be exactly one bar long. None if no bar could be judged.
+    """
+    full = meter_units(meter or tune.meter, tune.unit)
+    if not full:
+        return None
+    judged = right = 0
+    for b in bars(tune):
+        if b.units < full and (b.opens_section or b.closes_section):
+            continue  # pickup or its completion
+        judged += 1
+        right += b.units == full
+    return right / judged if judged else None
+
+
+def final_pitch_class(tune: Tune) -> int | None:
+    """Pitch class (0 = C) of the last note, applying the key signature and bar accidentals."""
+    key = parse_key(tune.key)
+    if key is None:
+        return None
+    sig = key.signature()
+    text = re.sub(r"\{[^}]*\}", "", _strip_non_notes(tune.body))
+    in_bar: dict[int, int] = {}
+    last: int | None = None
+    for m in re.finditer(r"\||(\^\^|\^|__|_|=)?([A-Ga-g])([,']*)", text):
+        if m.group(0) == "|":
+            in_bar.clear()
+            continue
+        acc_text, letter, marks = m.groups()
+        step = _step(letter, marks)
+        if acc_text is not None:
+            in_bar[step] = _ACC[acc_text]
+        acc = in_bar.get(step, sig.get(letter.upper(), 0))
+        last = (NATURAL_PC[letter.upper()] + acc) % 12
+    return last
+
+
+def tonic_pitch_class(key: str) -> int | None:
+    k = parse_key(key)
+    if k is None:
+        return None
+    return (NATURAL_PC[k.tonic[0]] + {"#": 1, "b": -1}.get(k.tonic[1:], 0)) % 12
+
+
+def note_count(tune: Tune) -> int:
+    """Notes in the body, not counting chord symbols, decorations or grace notes."""
+    text = re.sub(r"\{[^}]*\}", "", _strip_non_notes(tune.body))
+    return len(_NOTE.findall(text))

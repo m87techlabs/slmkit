@@ -80,8 +80,20 @@ the ambiguous case below).
 
 ## Graders
 
-*Phase C.* Planned: parses in `abc2midi`; bar durations match `M:`; ends on the tonic of `K:`; prompt
-adherence after SFT; n-gram novelty against the training set.
+In [`graders.py`](graders.py), each tested with known-good and known-bad tunes
+([`tests/test_graders.py`](tests/test_graders.py)):
+
+| Grader | Score | Calibration on the 4,248 human-transcribed tunes |
+|---|---|---|
+| `plays`: `abc2midi` plays it with no `Error` lines, ≥ 8 notes | 0/1 | the reference player; strict (any error fails) |
+| `bar_accuracy`: bars whose length matches the **requested** meter; pickups at section edges not judged | 0–1 | mean **0.990**; the few zeros are source files with wrong meter headers |
+| `ends_on_tonic`: the last note is the **requested** key's tonic | 0/1 | **80.5%** (real tunes often end on the third or fifth) |
+
+"Requested" is the prompt's meter and key (`EvalPrompt.meta`), so the same graders measure prompt
+adherence after SFT. The engine adds `novelty` (no 32-character copying from training), `ended` and
+`length`. An `ends_in_key` grader was tried and removed: ABC's key signature makes almost any ending
+in-key by construction (random characters score 98.7%). Full account:
+[`docs/concepts/evaluation.md`](../../docs/concepts/evaluation.md).
 
 ## Experiments
 

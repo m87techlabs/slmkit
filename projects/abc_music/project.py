@@ -178,14 +178,19 @@ class AbcMusic(Project):
         return TokenizerSpec(type="char")
 
     def eval_prompts(self, split: str) -> Iterator[EvalPrompt]:
-        # Header prefixes: the model should continue with a tune that fits them.
-        for name, header in (
-            ("reel-D", "R:reel\nM:4/4\nL:1/8\nK:D\n"),
-            ("jig-G", "R:jig\nM:6/8\nL:1/8\nK:G\n"),
-            ("hornpipe-A", "R:hornpipe\nM:4/4\nL:1/8\nK:A\n"),
-            ("air-Em", "M:3/4\nL:1/8\nK:Em\n"),
+        # Header prefixes: the model continues with a tune that should fit them. `meta` is what
+        # the graders check against (so the same graders measure prompt adherence after SFT).
+        for name, rhythm, meter, key in (
+            ("reel-D", "reel", "4/4", "D"),
+            ("jig-G", "jig", "6/8", "G"),
+            ("hornpipe-A", "hornpipe", "4/4", "A"),
+            ("air-Em", None, "3/4", "Em"),
         ):
-            yield EvalPrompt(id=name, prompt=header)
+            header = (f"R:{rhythm}\n" if rhythm else "") + f"M:{meter}\nL:1/8\nK:{key}\n"
+            yield EvalPrompt(id=name, prompt=header,
+                             meta={"rhythm": rhythm, "meter": meter, "key": key})  # fmt: skip
 
     def graders(self) -> list[Grader]:
-        return []  # Phase C
+        from .graders import GRADERS
+
+        return list(GRADERS)
