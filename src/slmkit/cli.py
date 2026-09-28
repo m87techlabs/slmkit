@@ -344,42 +344,112 @@ def sample(
     """Generate text from a trained (or partly trained) run."""
     import torch
 
-    from slmkit.config.schema import ModelConfig
-    from slmkit.model import CausalLM, ModelArgs
+    from slmkit.inference import load_run
     from slmkit.sampling import generate
     from slmkit.tokenizers import EOS_ID
-    from slmkit.train import checkpoint
-    from slmkit.train.run import load_run_config, runs_root
     from slmkit.train.trainer import pick_device
 
-    matches = sorted(p for p in runs_root().glob(f"{run_id}*") if p.is_dir())
-    if len(matches) != 1:
-        found = ", ".join(p.name for p in matches) or "none"
-        raise ConfigError(f"run {run_id!r} matches {len(matches)} runs ({found})")
-    run_dir = matches[0]
-    cfg = load_run_config(run_dir)
-    manifest = artifacts.read_manifest(run_dir)
-    tokenizer = load_tokenizer(artifacts.find_artifact(manifest["inputs"]["tokenizer"]))
-    ckpt_dir = run_dir / checkpoint.CKPT_DIR / checkpoint.BEST
-    if which == "latest" or not ckpt_dir.is_dir():
-        latest = checkpoint.latest(run_dir)
-        if latest is None:
-            raise ConfigError(f"{run_dir.name} has no checkpoint yet")
-        ckpt_dir = latest.path
-
     dev = pick_device(device)
-    args = ModelArgs.from_config(
-        ModelConfig.model_validate(cfg["model"]), tokenizer.vocab_size, cfg["data"]["block_size"]
-    )
-    model = CausalLM(args).to(dev)
-    model.load_state_dict(torch.load(ckpt_dir / "model.pt", map_location=dev, weights_only=True))
-    state = torch.load(ckpt_dir / "state.pt", map_location="cpu", weights_only=False)
-    typer.echo(f"# {run_dir.name} · {ckpt_dir.name} · step {state['step']} · "
-               f"val loss {state.get('last_val') or float('nan'):.4f}")  # fmt: skip
+    run = load_run(run_id, which, dev)
+    typer.echo(f"# {run.run_id} · {run.checkpoint} · step {run.state['step']} · "
+               f"val loss {run.state.get('last_val') or float('nan'):.4f}")  # fmt: skip
     prompt = prompt.encode().decode("unicode_escape")  # allow "\n" on the command line
-    idx = torch.tensor([tokenizer.encode(prompt)], device=dev)
+    idx = torch.tensor([run.tokenizer.encode(prompt)], device=dev)
     gen = torch.Generator(device=dev).manual_seed(seed)
     with torch.autocast(dev.type, dtype=torch.bfloat16, enabled=dev.type == "cuda"):
-        out = generate(model, idx, tokens, temperature=temperature, top_k=top_k, top_p=top_p,
-                       stop_token=EOS_ID, generator=gen)  # fmt: skip
-    typer.echo(tokenizer.decode(out[0].tolist()))
+        out = generate(run.model, idx, tokens, temperature=temperature, top_k=top_k,
+                       top_p=top_p, stop_token=EOS_ID, generator=gen)  # fmt: skip
+    typer.echo(run.tokenizer.decode(out[0].tolist()))
+
+
+@app.command("eval")
+@_friendly_errors
+def eval_(
+    run_id: str = typer.Argument(..., help="A run ID (or unique prefix) from `slm runs list`."),
+    seeds: str = typer.Option(None, help="Sampling seeds, e.g. 0,1,2. Default: eval.seeds."),
+    samples: int | None = typer.Option(None, help="Samples per seed. Default: eval.num_samples."),
+    which: str = typer.Option("best", help="best (lowest val loss) or latest checkpoint."),
+    baseline: bool = typer.Option(True, help="Also score the no-model frequency baseline."),
+    device: str = DEVICE,
+) -> None:
+    """Generate samples and grade them: every project grader plus novelty, mean ± spread."""
+    from slmkit.config.schema import EvalConfig
+    from slmkit.eval.runner import EvalSettings, evaluate, fmt
+    from slmkit.inference import load_run
+    from slmkit.train.trainer import pick_device
+
+    dev = pick_device(device)
+    run = load_run(run_id, which, dev)
+    ev = EvalConfig.model_validate(run.config.get("eval", {}))
+    settings = EvalSettings(
+        seeds=tuple(int(x) for x in seeds.split(",")) if seeds else tuple(ev.seeds),
+        num_samples=samples or ev.num_samples,
+        temperature=ev.temperature,
+        top_k=ev.top_k,
+        top_p=ev.top_p,
+        max_new_tokens=ev.max_new_tokens,
+    )
+    typer.echo(f"{run.run_id} ({run.config['run']['name']}) · {run.checkpoint} · step "
+               f"{run.state['step']} · {len(settings.seeds)} seeds × {settings.num_samples} samples")  # fmt: skip
+    report, path = evaluate(run, settings, dev, baseline=baseline, log=typer.echo)
+    has_base = "baseline" in report
+    typer.echo(
+        f"\n{'metric':<16} {'model':>17}"
+        + (f"  {'baseline (token frequencies)':>30}" if has_base else "")
+    )
+    for metric, stat in report["model"]["aggregate"].items():
+        line = f"{metric:<16} {fmt(stat):>17}"
+        if has_base:
+            line += f"  {fmt(report['baseline']['aggregate'][metric]):>30}"
+        typer.echo(line)
+    typer.echo(f"\nreport: {path}")
+
+
+RUN_IDS = typer.Argument(..., help="Two or more run IDs (or unique prefixes).")
+
+
+@runs_app.command("compare")
+@_friendly_errors
+def runs_compare(
+    run_ids: list[str] = RUN_IDS,
+) -> None:
+    """Side by side: config, training result and latest eval report of each run."""
+    import json
+
+    from slmkit.eval.runner import fmt, latest_report
+    from slmkit.inference import resolve_run
+    from slmkit.train.run import load_run_config, read_status
+
+    cols: list[dict[str, str]] = []
+    metrics: list[str] = []
+    for rid in run_ids:
+        run_dir = resolve_run(rid)
+        cfg, st = load_run_config(run_dir), read_status(run_dir) or {}
+        tok = cfg["tokenizer"]
+        records = [json.loads(x) for x in (run_dir / "metrics.jsonl").read_text().splitlines()]
+        evals = [r for r in records if r["kind"] == "eval"]
+        best = min(evals, key=lambda r: r["val_loss"]) if evals else {}
+        col = {
+            "run": run_dir.name[:12],
+            "name": cfg["run"]["name"],
+            "model": cfg["model"]["preset"],
+            "tokenizer": tok["type"] + (f" {tok['vocab_size']}" if tok.get("vocab_size") else ""),
+            "seed": str(cfg["run"]["seed"]),
+            "tokens": _short(st.get("tokens_seen", 0)),
+            "GPU-h": f"{st.get('gpu_seconds', 0) / 3600:.2f}",
+            "best val loss": f"{best['val_loss']:.4f}" if best else "-",
+            "best val bpc": f"{best['val_bpc']:.3f}" if "val_bpc" in best else "-",
+        }
+        report = latest_report(run_dir)
+        if report:
+            col["eval"] = f"{report['eval_id']} ({len(report['settings']['seeds'])} seeds)"
+            for m, stat in report["model"]["aggregate"].items():
+                col[m] = fmt(stat)
+                if m not in metrics:
+                    metrics.append(m)
+        cols.append(col)
+    rows = ["run", "name", "model", "tokenizer", "seed", "tokens", "GPU-h", "best val loss",
+            "best val bpc", "eval", *metrics]  # fmt: skip
+    width = max(18, *(len(v) for c in cols for v in c.values()))
+    for row in rows:
+        typer.echo(f"{row:<16}" + "".join(f"  {c.get(row, '-'):>{width}}" for c in cols))

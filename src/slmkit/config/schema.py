@@ -112,6 +112,7 @@ class EvalConfig(_Strict):
     temperature: float = Field(0.8, gt=0.0)
     top_k: int | None = None
     top_p: float | None = None
+    max_new_tokens: int = Field(600, gt=0)  # per sample; a sample may also end early with <eos>
 
 
 class ExperimentConfig(_Strict):

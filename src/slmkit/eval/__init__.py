@@ -1,1 +1,1 @@
-"""slmkit — see docs/DESIGN.md."""
+"""Evaluation: `slm eval` (runner.py). See docs/concepts/evaluation.md."""
