@@ -96,13 +96,17 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
       and `evaluation.md` (why programmatic graders, why ≥3 seeds, what a baseline is for).
 
 **Exit criteria**
-- The best model beats a trivial baseline on every grader; parse rate ≥ 95%.
-- The n-gram novelty grader shows it isn't regurgitating training tunes.
-- SFT with a natural-language prompt reaches **at least parity** with the base model given a
-  header prefix, on meter and key adherence (DESIGN §5.1 — parity is the pass mark, not a win).
-- An exported model loads in HF `transformers` with matching logits and serves via `slm serve`.
-- **Framework check:** a new ABC experiment is a YAML file only.
-- You have listened to a generated tune on Windows and it sounds like a tune.
+- [ ] The best model beats a trivial baseline on every grader; parse rate ≥ 95%. *(So far: every
+      grader beats the baseline, but the best `plays` is 0.730, from the SFT model. Phase F.)*
+- [x] The n-gram novelty grader shows it isn't regurgitating training tunes (0.998: 0.2% of
+      32-character windows appear in training).
+- [x] SFT with a natural-language prompt reaches **at least parity** with the base model given a
+      header prefix, on meter and key adherence (DESIGN §5.1 — parity is the pass mark, not a win).
+      Bars 0.851 vs 0.708, tonic 0.340 vs 0.212 (runbook D.3, re-measured in Phase E).
+- [x] An exported model loads in HF `transformers` with matching logits (difference 0.0) and serves
+      via `slm serve`.
+- [ ] **Framework check:** a new ABC experiment is a YAML file only. *(Phase F's sweep experiments.)*
+- [x] You have listened to a generated tune on Windows and it sounds like a tune.
 
 ---
 

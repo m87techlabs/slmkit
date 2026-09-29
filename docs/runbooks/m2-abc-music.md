@@ -1017,4 +1017,4 @@ also how Phase E found the eval-prompt flaw (C.6): a hornpipe that sounded right
 - [x] `slm serve` answers `/health`, `/info` and `/generate`, validates requests, and reports unknown
       prompt characters.
 - [x] `--to-windows` writes `.abc` and `.mid` files with a graded index.
-- [ ] **You** have run E.1–E.5, and listened to a generated tune on Windows.
+- [x] **You** have run E.1–E.5, and listened to a generated tune on Windows: it sounds like a tune.
