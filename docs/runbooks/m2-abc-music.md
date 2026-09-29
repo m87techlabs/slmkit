@@ -9,8 +9,8 @@ Built up phase by phase, like the M1 runbook.*
 | **A** | The ABC corpus: clean, group, transpose, header dropout | ☑ |
 | **B** | BPE tokenizer, compared with char by bits per character | ☑ |
 | **C** | Graders, `slm eval`, `slm runs compare` | ☑ |
-| **D** | SFT: prompts from headers, loss on the answer only | ☑ this page |
-| E | Export, serve, listen on Windows | ☐ |
+| **D** | SFT: prompts from headers, loss on the answer only | ☑ |
+| **E** | Export, serve, listen on Windows | ☑ this page |
 | F | Sweeps, exit criteria | ☐ |
 
 Run everything from the repo root, with the extras installed (`uv sync --all-extras`: the project
@@ -748,3 +748,273 @@ novelty                          0.981 ± 0.006                 0.998 ± 0.001
 - [x] SFT + plain-language requests reaches parity with base + headers on plays and bars (re-measured
       in Phase E: it exceeds it).
 - [ ] **You** have run D.1–D.3 and the output matches.
+
+---
+
+# Phase E: export, serve, listen
+
+*Concepts: [`../concepts/serving.md`](../concepts/serving.md). Code:
+[`src/slmkit/export/`](../../src/slmkit/export/), [`src/slmkit/serve/app.py`](../../src/slmkit/serve/app.py).
+Decision: [ADR 0007](../decisions/0007-model-export-and-render-hook.md). File formats:
+[`../MODEL.md`](../MODEL.md) §6.*
+
+## E.0 The checks
+
+```bash
+make test                                                                       # 188 passed
+uv run pytest -q tests/unit/test_export.py tests/unit/test_export_hf.py tests/unit/test_serve.py   # 18 passed
+```
+
+The one DESIGN requires is `test_transformers_matches_slmkit_on_the_export`: a trained toy model is
+exported, loaded through `AutoModelForCausalLM` and `AutoTokenizer`, and must give the same token IDs
+and logits within 1e-4 over a full context of random tokens. `test_versions_are_immutable` and
+`test_serve.py` cover the rest of this page.
+
+---
+
+## E.1 Export the fine-tuned model
+
+```bash
+uv run slm export run-9b89 --name abc-folk --version 1
+```
+```
+checking parity on 1.tmp ...
+  slmkit round trip: max |Δlogit| = 0.0e+00 over 94 tokens
+  transformers 5.17.0: max |Δlogit| = 0.0e+00, tokenizer IDs match: True
+exported abc-folk:1 -> ~/slm/models/abc-folk/1
+```
+
+Before the directory existed under its final name, it was loaded back twice, by slmkit and by
+`transformers`, and both gave exactly the checkpoint's logits (serving.md §4). A failed check would
+have left nothing behind.
+
+Also export the base model, and the BPE model to prove the other tokenizer type:
+
+```bash
+uv run slm export run-749d --name abc-folk-base --version 1
+uv run slm export run-f79b --name abc-folk-bpe --version 1
+uv run slm models list
+```
+```
+MODEL                STAGE        PARAMS RUN                 STEP  HF PARITY  CREATED
+abc-folk:1           sft         864,256 run-9b890db6dced    1000    0.0e+00  2026-09-28T19:43:09-05:00
+abc-folk-base:1      pretrain    864,256 run-749d028accd4     916    0.0e+00  2026-09-28T19:43:12-05:00
+abc-folk-bpe:1       pretrain    918,656 run-f79bc95199ab     916    0.0e+00  2026-09-28T19:43:14-05:00
+```
+
+**Look inside:**
+
+```bash
+ls -l ~/slm/models/abc-folk/1
+cat ~/slm/models/abc-folk/1/config.json
+less ~/slm/models/abc-folk/1/MODEL_CARD.md
+```
+```
+-rw-r--r-- 1 you you    2910 MODEL_CARD.md
+-rw-r--r-- 1 you you     641 config.json
+-rw-r--r-- 1 you you     122 generation_config.json
+-rw-r--r-- 1 you you    1972 manifest.json
+-rw-r--r-- 1 you you 3461056 model.safetensors
+-rw-r--r-- 1 you you    2068 tokenizer.json
+-rw-r--r-- 1 you you     167 tokenizer_config.json
+```
+
+- `model.safetensors` is 3.5 MB: 864,256 parameters × 4 bytes. The run's checkpoint is 10 MB,
+  because it also holds AdamW's two running averages.
+- `config.json` says `"architectures": ["LlamaForCausalLM"]`, `"hidden_size": 128`,
+  `"tie_word_embeddings": true`: slmkit's settings under Hugging Face's names.
+- The card's example prompt is `% a reel in D major, 2/2 time`, and its evaluation table is the SFT
+  eval from D.3 (`ev-0ddc32e2a9`: plays 0.730, bar_accuracy 0.851). A base model's card reports its
+  header-prompt eval instead.
+
+**Why:** a checkpoint is the trainer's private state; an export is what everyone else uses, so it has
+to be standard, self-describing and checked (serving.md §1).
+
+---
+
+## E.2 Versions are immutable
+
+```bash
+uv run slm export run-9b89 --name abc-folk --version 1     # the same checkpoint again
+uv run slm export run-749d --name abc-folk --version 1     # a different run, same version
+```
+```
+abc-folk:1 already exported from run-9b890db6dced step 1000
+error: abc-folk:1 already exists (from run-9b890db6dced step 1000); versions are immutable, use --version 2
+```
+
+The first is a no-op, like a pipeline stage whose artifact exists. The second is refused: a client
+that tested against `abc-folk:1` must get the same model tomorrow (serving.md §5).
+
+```bash
+uv run slm lineage abc-folk:1
+```
+```
+abc-folk:1  [model]  created 2026-09-28T19:43:09-05:00  git 4deaa10 (dirty)
+    stage = sft
+    checkpoint = best
+    step = 1000
+    …
+    run: run-9b890db6dced  [run]  created 2026-09-28T19:00:27-05:00  git b58da0b (dirty)
+        …
+        parent: run-749d028accd4  [run]  created 2026-09-25T11:10:36-05:00  git 9329250 (dirty)
+            …
+            packed: pk-337567abd517  [packed]  …
+                dataset: ds-f4f721a6c0e4  [dataset]  …
+                    raw: raw-3b076cc50c50  [raw]  …
+```
+
+From the deployed model back to the tune books, through both training stages.
+
+---
+
+## E.3 Load it with Hugging Face `transformers`
+
+No slmkit code involved: this is how anyone else would use the export.
+
+```bash
+uv run python - <<'PY'
+import os, torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+path = os.path.expanduser("~/slm/models/abc-folk/1")
+tok = AutoTokenizer.from_pretrained(path)
+model = AutoModelForCausalLM.from_pretrained(path)
+ids = tok("% a jig in G major, 6/8 time\n", return_tensors="pt", add_special_tokens=False).input_ids
+torch.manual_seed(0)
+out = model.generate(ids, do_sample=True)  # generation_config.json: temperature 0.8, stop at <eos>
+print(tok.decode(out[0], skip_special_tokens=True))
+PY
+```
+```
+% a jig in G major, 6/8 time
+R:jig
+M:6/8
+L:1/8
+K:G
+d|cBA GFE|Bcd ecA|GFE D2(G/A/)|
+BGG GAB|cBA GAB|cBc edc|BGE E2:|
+||e|fef dcB|cBA GAB|cBA Bcd|ecA ABG|
+|efe fed|cBA ABd|cBA GED|GFG AFD:|
+```
+
+`model.generate` read the sampling defaults from `generation_config.json` and stopped at `<eos>`
+(token 1) by itself. A different library, the same model.
+
+---
+
+## E.4 Serve it
+
+In one terminal (or a tmux pane):
+
+```bash
+uv run slm serve --model abc-folk:1
+```
+```
+abc-folk:1: 864,256 params, sft, from run-9b890db6dced step 1000 · device cpu
+try: curl -s http://127.0.0.1:8000/info
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+In another:
+
+```bash
+curl -s localhost:8000/health
+curl -s localhost:8000/info | python3 -m json.tool
+curl -s localhost:8000/generate -H 'content-type: application/json' \
+  -d '{"prompt": "% a reel in D major, 2/2 time\n", "seed": 0}' | python3 -m json.tool
+```
+```
+{"status":"ok","model":"abc-folk:1"}
+…
+{
+    "model": "abc-folk:1",
+    "completion": "R:reel\nM:2/2\nL:1/8\nK:F\n((3GAB) | c2 ((3dcB) A2 ((3def) | …",
+    "finished": true,
+    "prompt_tokens": 30,
+    "new_tokens": 244,
+    "unknown_prompt_tokens": 0,
+    "seed": 0,
+    "settings": {"max_new_tokens": 600, "temperature": 0.8, "top_k": 0, "top_p": 1.0},
+    "seconds": 0.5479,
+    "tokens_per_second": 445.3
+}
+```
+
+Half a second on the CPU. Notice `K:F`: asked for D major, this sample is in F. The model follows the
+key most of the time, not always, and the graders measure how often. (`"seed": 0` on the CPU; the same
+seed on a GPU gives a different tune, because the two random-number generators differ.)
+
+**Try to break it:**
+
+```bash
+curl -s localhost:8000/generate -H 'content-type: application/json' \
+  -d '{"prompt": "% Write a jig?\n", "seed": 0, "max_new_tokens": 60}' | python3 -m json.tool | grep unknown
+curl -s -w '\nHTTP %{http_code}\n' localhost:8000/generate -H 'content-type: application/json' \
+  -d '{"prompt": "% a jig", "temprature": 0.5}'
+```
+```
+    "unknown_prompt_tokens": 2,
+{"detail":[{"type":"extra_forbidden","loc":["body","temprature"],"msg":"Extra inputs are not permitted","input":0.5}]}
+HTTP 422
+```
+
+`W` and `?` aren't in the vocabulary (sft.md §1), and the server says so instead of silently
+answering a garbled prompt. A misspelt field is an error, not a silently ignored setting. Open
+`http://127.0.0.1:8000/docs` in a Windows browser for the interactive API page (WSL forwards
+localhost). Stop the server with Ctrl-C.
+
+**Why so small:** one model, one request at a time, no auth, localhost only. Anything others can
+reach gets a gateway in front (M4); see serving.md §6.
+
+---
+
+## E.5 Listen on Windows
+
+```bash
+uv run slm export run-9b89 --name abc-folk --version 1 --to-windows
+```
+```
+abc-folk:1 already exported from run-9b890db6dced step 1000
+sampling 2 per prompt on cuda ...
+  reel-D-0         .abc .mid  ended=1.00 plays=1.00 bar_accuracy=1.00 ends_on_tonic=0.00
+  reel-D-1         .abc .mid  ended=1.00 plays=0.00 bar_accuracy=1.00 ends_on_tonic=0.00
+  jig-G-0          .abc .mid  ended=1.00 plays=1.00 bar_accuracy=1.00 ends_on_tonic=0.00
+  jig-G-1          .abc .mid  ended=1.00 plays=1.00 bar_accuracy=1.00 ends_on_tonic=1.00
+  hornpipe-A-0     .abc .mid  ended=1.00 plays=1.00 bar_accuracy=1.00 ends_on_tonic=0.00
+  hornpipe-A-1     .abc .mid  ended=1.00 plays=0.00 bar_accuracy=1.00 ends_on_tonic=0.00
+  air-Em-0         .abc .mid  ended=1.00 plays=1.00 bar_accuracy=0.33 ends_on_tonic=0.00
+  air-Em-1         .abc .mid  ended=1.00 plays=1.00 bar_accuracy=0.67 ends_on_tonic=0.00
+wrote /mnt/c/Users/Public/Music/slmkit/abc-folk-v1
+on Windows: C:\Users\Public\Music\slmkit\abc-folk-v1
+```
+
+On Windows, open `C:\Users\Public\Music\slmkit\abc-folk-v1` in Explorer:
+
+1. **Play `jig-G-0.mid`** (double-click; Media Player plays MIDI). Then `reel-D-0.mid` and
+   `hornpipe-A-0.mid`.
+2. **Play the samples that scored `plays=0.00`**, `reel-D-1.mid` and `hornpipe-A-1.mid`. `abc2midi`
+   still made MIDI files, but reported errors on the way: "Malformed note" in the reel (a stray
+   character mid-bar) and "Could not find note to be tied" in the hornpipe (C.5 lists the usual
+   causes). Listen for whether you can hear the slip.
+3. **Open `SAMPLES.md`** for every file's scores, and an `.abc` file in any ABC app or text editor to
+   see the notation: `jig-G-0.abc` starts `X:1`, `T:jig-G (generated)`, then the request as a `%`
+   comment and the tune.
+
+The export's `MODEL_CARD.md` is copied alongside. The folder is a convenience copy, rewritten every
+time; the model itself stays in `$SLM_HOME`.
+
+**Why:** graders set a floor; a person listening is the other half of the exit criteria. Listening is
+also how Phase E found the eval-prompt flaw (C.6): a hornpipe that sounded right scored 0 on bars.
+
+---
+
+## Phase E: done when
+
+- [x] `make test` (188), `make test-gpu` (4) and `make lint` pass.
+- [x] `slm export` writes an HF-format model and refuses to publish unless slmkit and `transformers`
+      reproduce the checkpoint's logits (measured difference: 0.0, char and BPE).
+- [x] Versions are immutable, and `slm lineage` reaches raw data from a model.
+- [x] `slm serve` answers `/health`, `/info` and `/generate`, validates requests, and reports unknown
+      prompt characters.
+- [x] `--to-windows` writes `.abc` and `.mid` files with a graded index.
+- [ ] **You** have run E.1–E.5, and listened to a generated tune on Windows.

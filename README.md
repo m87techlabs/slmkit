@@ -82,7 +82,9 @@ uv run slm run shakespeare_char/ref
 
 M0 (environment) and M1 (engine, validated by reproducing a published character-level
 Shakespeare result: best validation loss 1.29) are complete. M2, the first full-lifecycle project
-(ABC music), is next. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+(ABC music), is in progress: a model trained from scratch, fine-tuned to take requests in words,
+graded, exported in Hugging Face format and served over HTTP. The sweeps remain. See
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## License
 

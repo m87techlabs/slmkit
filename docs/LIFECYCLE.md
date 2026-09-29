@@ -90,14 +90,16 @@ Explainers: [`concepts/the-model.md`](concepts/the-model.md),
 | Step | What happens | slmkit command | Status |
 |---|---|---|---|
 | Inspect | generate text from a checkpoint | `slm sample` | ☑ M1 |
-| Export | convert to Hugging Face format (`safetensors` + config + tokenizer + model card); verify logits match | `slm export` | M2 (parity already proven in M1) |
-| Serve | small HTTP API, `/generate` | `slm serve` | M2 |
+| Export | convert to Hugging Face format (`safetensors` + config + tokenizer + model card); verify logits match before publishing | `slm export` | ☑ M2 |
+| Serve | small HTTP API: `/health`, `/info`, `/generate` | `slm serve` | ☑ M2 |
+| Listen / look | generated samples rendered by the project (MIDI for music) where Windows can open them | `slm export --to-windows` | ☑ M2 |
 | Package | container image, gateway in front (auth, TLS, rate limits), optional Kubernetes | Dockerfile, Compose | M4 |
 | Quantize | GGUF for llama.cpp-style runtimes | documented conversion | M4 |
-| Manage | model registry, lineage from model back to raw data, run history, off-box backups | `slm lineage`, `slm runs list`, registry | lineage + runs ☑ M1; registry + backup M4 |
+| Manage | model registry, lineage from model back to raw data, run history, off-box backups | `slm lineage`, `slm runs list`, `slm models list` | lineage + runs ☑ M1; versioned models ☑ M2; backup M4 |
 | Monitor | serving latency, error rates, drift in what users ask | — | M4 (light; single-user) |
 
-Specification of every file format involved: [`MODEL.md`](MODEL.md) §6.
+Specification of every file format involved: [`MODEL.md`](MODEL.md) §6. How export and serving
+work, and why: [`concepts/serving.md`](concepts/serving.md).
 
 ---
 
@@ -228,10 +230,10 @@ and ends when its exit criteria are met ([`ROADMAP.md`](ROADMAP.md)).
 | Environment + tooling | ☑ | | | | | |
 | Collect / split / tokenize / pack | | ☑ char | BPE, augmentation | fixed vocab, streaming, exclusions | | ball-event vocab |
 | Pretrain + evaluate | | ☑ | sweeps, ≥ 3 seeds | scaling study | | larger runs |
-| Graders | | by hand (novelty) | ☑ planned | legal moves, Elo | | calibration |
+| Graders | | by hand (novelty) | ☑ | legal moves, Elo | | calibration |
 | Fine-tune (SFT) | | | ☑ | | | |
-| Export + serve | | parity proven | ☑ planned | legal-move masking | GGUF, container, gateway | |
-| Manage + monitor | | lineage, runs list | model card | | registry, backups | |
+| Export + serve | | parity proven | ☑ export, serve, MIDI | legal-move masking | GGUF, container, gateway | |
+| Manage + monitor | | lineage, runs list | ☑ model card, versions | | registry, backups | |
 
 ---
 

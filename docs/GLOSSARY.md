@@ -332,6 +332,10 @@ set whose probabilities sum to p. Both suppress implausible choices.
 illegal chess moves to negative infinity. Also called **constrained decoding**. It enforces
 rules the model was never guaranteed to learn.
 
+**Generation config.** The default sampling settings (temperature, top-k, top-p, maximum new tokens,
+stop token) shipped with an exported model as `generation_config.json`, so users sample the way the
+evaluation did.
+
 ---
 
 ## Evaluation
@@ -414,6 +418,21 @@ hub. "HF format" is the de-facto standard model layout, which is why slmkit expo
 **safetensors.** A tensor file format that is safe to load from untrusted sources, unlike
 Python's `pickle`.
 
+**Export.** A trained checkpoint rewritten in a standard format (here Hugging Face's) with its
+tokenizer, default settings and model card, so tools other than the trainer can use it. slmkit
+addresses exports as `name:version`, like a container image tag, and never changes a version.
+
+**Model card.** The README that travels with a model: what it is for, how to prompt it, what it was
+trained on, how it scored, and where it fails. From Mitchell et al. (2019), "Model Cards for Model
+Reporting". slmkit generates `MODEL_CARD.md` from the export's manifest.
+
+**Parity check.** Loading an export with a second implementation (slmkit's own loader, then HF
+`transformers`) and confirming the logits match the original checkpoint's. It catches exports that
+load without errors but compute something slightly different.
+
+**WordLevel.** A Hugging Face tokenizer model that maps whole pre-split pieces to IDs with no merging.
+slmkit exports its character tokenizer as WordLevel over single characters.
+
 **GGUF.** The model file format used by `llama.cpp`, aimed at efficient CPU and mixed inference.
 
 **llama.cpp / vLLM / Ollama.** Inference engines. `llama.cpp` targets CPU and small machines,
@@ -476,6 +495,17 @@ immediately with a clear message instead of halfway through a run.
 **Typer.** The library building slmkit's `slm` command-line interface.
 
 **ruff / mypy / pytest.** Linter and formatter; static type checker; test runner.
+
+**API — Application Programming Interface.** The contract a program offers other programs. For
+`slm serve`, an **HTTP** (HyperText Transfer Protocol) API: JSON requests to `/generate`, JSON
+responses back. A **422** response means the request body failed validation.
+
+**ASGI / WSGI.** Python's two standard interfaces between a web server and a web app: WSGI
+(Web Server Gateway Interface) is synchronous, ASGI (Asynchronous Server Gateway Interface) its
+async successor. Uvicorn is an ASGI server; FastAPI is an ASGI app.
+
+**TLS — Transport Layer Security.** The encryption behind HTTPS. `slm serve` has none on purpose and
+binds to localhost; a gateway in front provides it (M4).
 
 ---
 
@@ -565,3 +595,7 @@ fixed vocabulary.
 **Stockfish.** The strongest open-source chess engine; used as an opponent to measure strength.
 
 **Cricsheet.** A public source of ball-by-ball cricket match data.
+
+**MIDI — Musical Instrument Digital Interface.** A standard file format (`.mid`) that stores notes
+and timings rather than sound; any media player renders it with a built-in synthesizer. `abc2midi`
+converts ABC to MIDI so generated tunes can be heard.

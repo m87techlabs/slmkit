@@ -265,19 +265,30 @@ $SLM_HOME/runs/<run_id>/
 
 ### After training: the export (M2), for everyone else
 
+Written by `slm export <run> --name <name> --version <n>` (`src/slmkit/export/hf.py`):
+
 ```
 $SLM_HOME/models/<name>/<version>/
-├── config.json                 HF LlamaConfig: sizes, vocab_size, rope_theta, norm eps, ...
-├── model.safetensors           weights only
-├── tokenizer.json (+ config)   the paired tokenizer
-├── MODEL_CARD.md               project, data, params, tokens trained, eval results, lineage
-└── manifest.json
+├── config.json                 HF LlamaConfig: sizes, vocab_size, rope_theta, norm eps, eos id
+├── generation_config.json      default sampling: temperature, top_k, top_p, max_new_tokens
+├── model.safetensors           weights only, fp32
+├── tokenizer.json              HF tokenizers format (char → WordLevel, BPE unchanged)
+├── tokenizer_config.json       lets AutoTokenizer find <unk> and <eos>
+├── MODEL_CARD.md               how to prompt it, training, eval results, parity, limitations
+└── manifest.json               lineage (run, tokenizer) and the parity check results
 ```
 
 - **Format:** **safetensors**, a JSON header plus raw tensor bytes. It can't execute code, loads by
   memory-mapping, and is the ecosystem standard.
-- **Precision:** fp32 by default (at these sizes the file is small: `ref` ≈ 43 MB, `small` ≈ 346
-  MB). bf16 halves that and is an export option.
+- **Precision:** fp32. At these sizes the file is small: the `abc_music` nano model is 3.5 MB, `ref`
+  would be about 43 MB and `small` about 346 MB. bf16 would halve that; it isn't implemented, because
+  nothing here is short of disk and fp32 keeps the parity check exact.
+- **Tied head stored once.** With tied embeddings `lm_head.weight` is the embedding tensor. safetensors
+  can't store two names for one tensor, so the head is left out and HF re-ties it on load
+  (`tie_word_embeddings: true`). The nano export holds 38 tensors: the embedding, the final norm, and 9
+  per layer.
+- **Versions are immutable.** Exporting the same checkpoint again is a no-op; a different checkpoint
+  needs a new version number. Serving addresses models as `name:version`.
 - **Parameter names** follow `LlamaForCausalLM`, so loading it needs no custom code:
 
   | slmkit tensor | HF name |
@@ -288,10 +299,12 @@ $SLM_HOME/models/<name>/<version>/
   | per-layer MLP norm | `model.layers.{i}.post_attention_layernorm.weight` |
   | SwiGLU gate / up / down | `model.layers.{i}.mlp.{gate,up,down}_proj.weight` |
   | final norm | `model.norm.weight` |
-  | output head | `lm_head.weight` (tied: same tensor as the embedding) |
+  | output head | `lm_head.weight` (tied: same tensor as the embedding, not stored) |
 
-- **Proof it is right:** the export test loads it with HF `transformers` and checks that the logits
-  match slmkit's within tolerance.
+- **Proof it is right:** every export is loaded back twice before it is published. slmkit must get
+  identical logits; `AutoModelForCausalLM` and `AutoTokenizer` must get the same token IDs and logits
+  within 1e-4. Measured on the three `abc_music` exports: a difference of exactly 0.0 (same PyTorch
+  kernels, same order of operations). See concepts/serving.md.
 
 ### Optional: GGUF (M4)
 

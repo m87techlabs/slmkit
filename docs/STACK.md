@@ -235,14 +235,17 @@ the train split, specials at the same IDs as the char tokenizer). Its output for
 256 base IDs when ABC uses 87 characters (tokenization.md §6).
 
 ### safetensors
-**◐ M2** (export) · `0.8` · [docs](https://huggingface.co/docs/safetensors)
+**●** (export, since M2) · `0.8` · [docs](https://huggingface.co/docs/safetensors)
 
 **What it is.** A file format for storing tensors: a JSON header plus raw bytes.
 
 **Why.** PyTorch's default `torch.save` uses Python **pickle**, and loading a pickle can execute
 arbitrary code, like `eval`-ing a file you downloaded. safetensors has no code execution, loads
-via memory-mapping, and is the standard for sharing weights. Exported models use it. Internal
-resume checkpoints still hold optimizer and RNG state that only slmkit reads (DESIGN §6.6).
+via memory-mapping, and is the standard for sharing weights. `slm export` writes
+`model.safetensors`. Internal resume checkpoints still use `torch.save`, because they hold
+optimizer and RNG state that only slmkit reads (DESIGN §6.6). One consequence shows up in
+`export/hf.py`: safetensors can't store two names for one tensor, so the tied output head is left
+out and re-tied on load (serving.md §2).
 
 ### Hugging Face `transformers`
 **○** extra `export` · `5.17` · [docs](https://huggingface.co/docs/transformers) ·
@@ -251,9 +254,11 @@ resume checkpoints still hold optimizer and RNG state that only slmkit reads (DE
 **What it is.** The most widely used library of pretrained model implementations.
 
 **Why, and why only here.** slmkit's model uses the same parameter names as `LlamaForCausalLM`.
-The export test loads a slmkit model into `transformers` and checks that the logits match, which
-proves the export is correct and makes the whole HF ecosystem able to use it. It is **never** used
-for training (CONTRIBUTING.md rule 6). The point of slmkit is to write that part yourself.
+`slm export` loads every export back through `AutoModelForCausalLM` and `AutoTokenizer` and
+refuses to publish it unless the logits and token IDs match slmkit's. That proves the export is
+correct, and it means the whole HF ecosystem can use it. The check is skipped, and recorded as
+skipped, when the extra isn't installed. It is **never** used for training or serving (CONTRIBUTING.md
+rule 6). The point of slmkit is to write that part yourself.
 
 ### GGUF and llama.cpp
 **◐ M4** · [GGUF](https://huggingface.co/docs/hub/gguf) · [llama.cpp](https://github.com/ggml-org/llama.cpp)
@@ -337,15 +342,28 @@ tracking has to work with Docker stopped.
 ## 7. Serving and operations
 
 ### FastAPI and Uvicorn
-**◐ M2** · FastAPI `0.141`, Uvicorn `0.53` · [FastAPI](https://fastapi.tiangolo.com/) ·
+**●** (since M2) · FastAPI `0.141`, Uvicorn `0.53` · [FastAPI](https://fastapi.tiangolo.com/) ·
 [Uvicorn](https://uvicorn.dev/)
 
 **What they are.** FastAPI is a Python web framework, typed with pydantic. Uvicorn is the ASGI
 server that runs it (for comparison, gunicorn fills the same role for WSGI apps).
 
-**Why.** `slm serve` is a single `/generate` endpoint. FastAPI reuses the same pydantic models as
-the config, and the models are small enough to serve from the CPU. Auth, TLS and rate limiting
-are deliberately left to a gateway in front of it (M4).
+**Why.** `slm serve` (`serve/app.py`) is three endpoints: `/health`, `/info` and `/generate`. The
+request body is a pydantic model, the same tool as the config, so a misspelt field or an
+out-of-range temperature is a 422 with a clear message and no hand-written validation. The
+interactive docs at `/docs` come free. The models are small enough to serve from the CPU. Auth,
+TLS and rate limiting are deliberately left to a gateway in front of it (M4). Rejected: Flask
+(no request typing); Python's `http.server` (validation and JSON by hand); TorchServe and NVIDIA
+Triton Inference Server, which are built for fleets of GPU models, not one 3.5 MB file.
+
+### HTTPX
+**●** extra `dev` · `0.28` · [docs](https://www.python-httpx.org/)
+
+**What it is.** An HTTP client library for Python.
+
+**Why.** FastAPI's `TestClient` is built on it: `tests/unit/test_serve.py` calls the app in
+process, with no port opened, the way `curl` would. It is only needed for tests, so it lives in
+the `dev` extra.
 
 ### Docker and Kubernetes
 **◐ M4** (optional) · [Docker](https://docs.docker.com/) · [Kubernetes](https://kubernetes.io/docs/) ·

@@ -545,14 +545,21 @@ one allowed exception is `export --to-windows`.
 ### 6.9 Export and serving
 
 - `slm export <run_id> --name abc-folk --version 1` writes an HF-format directory
-  (`config.json` for `LlamaForCausalLM`, `model.safetensors`, tokenizer files) plus
-  `MODEL_CARD.md` (project, data, params, tokens, eval summary, lineage).
-- **Acceptance test:** load the export with HF `transformers` and check logits match slmkit's
-  within tolerance.
+  (`config.json` for `LlamaForCausalLM`, `generation_config.json`, `model.safetensors`, tokenizer
+  files) plus `MODEL_CARD.md` (prompt format, params, tokens, eval summary, parity, lineage) and a
+  manifest. Versions are immutable; `slm lineage abc-folk:1` walks back to the raw data.
+- **Acceptance test, run on every export before it is published:** slmkit reloads the files with
+  identical logits, and HF `transformers` (when installed) matches within 1e-4 from the same token
+  IDs. A failed check publishes nothing.
+- `--to-windows` samples the project's eval prompts and writes each sample through
+  `Project.render_sample` (ADR 0007) to a folder on the Windows drive, with the model card and a
+  graded index. It is a convenience copy, not an artifact.
 - GGUF: document the llama.cpp conversion in `export/gguf.md`. Char-level and fixed vocabularies
   may need a custom tokenizer mapping, so verify per project.
-- `slm serve --model abc-folk:1` runs a small FastAPI app (`/generate`) applying the project's
-  `logits_processor`. Models are tiny, so CPU serving is fine.
+- `slm serve --model abc-folk:1` runs a small FastAPI app (`/health`, `/info`, `/generate`) on
+  127.0.0.1. It serves the export, never a run directory, and needs no project code. Models are
+  tiny, so CPU serving is the default. Applying the project's `logits_processor` arrives with the
+  first project that has one (chess, M3).
 - For anything worth keeping online, put an existing gateway in front rather than exposing
   `slm serve` directly — it handles auth, rate limiting and TLS, which this app deliberately
   does not.
