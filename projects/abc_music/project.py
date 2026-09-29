@@ -15,15 +15,16 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from slmkit.project_api import Doc, EvalPrompt, Grader, Project, TokenizerSpec
+from slmkit.project_api import Doc, EvalPrompt, Grader, Project, SFTExample, TokenizerSpec
 from slmkit.registry import register_project
 
 from .abcnotation import (
+    Key,
     NotTransposable,
     Tune,
     clean_tune,
@@ -36,6 +37,40 @@ from .abcnotation import (
 )
 
 COLLECTIONS = ("ryansMammoth", "oneills1850", "airdsAirs")
+
+# SFT requests, in plain words. The vocabulary was fixed at pretraining from ABC text, which has
+# no q, no capital J/N/W/X/Y and no "?": a request using them would contain <unk> tokens the
+# model has never learned (test_sft_requests_use_only_known_characters). Hence lower-case starts.
+MODE_WORDS = {"": "major", "m": "minor", "dor": "dorian", "mix": "mixolydian",
+              "lyd": "lydian", "phr": "phrygian", "loc": "locrian"}  # fmt: skip
+WITH_RHYTHM = (
+    "{a} {rhythm} in {key}",
+    "write {a} {rhythm} in {key}",
+    "compose {a} {rhythm} in the key of {key}",
+    "{a} {rhythm} in {key}, {meter} time",
+    "{rhythm} in {key}",
+)
+WITHOUT_RHYTHM = (
+    "a tune in {meter} time in {key}",
+    "write a tune in {key}, {meter} time",
+    "compose something in {meter} time, key of {key}",
+)
+# The prompt is an ABC comment line, so request + answer is still a valid ABC file.
+REQUEST = "% {}\n"
+
+
+def key_words(key: Key) -> str:
+    return f"{key.tonic} {MODE_WORDS[key.mode]}"
+
+
+def request(rhythm: str | None, meter: str, key: Key, choice: float = 0.0) -> str:
+    """A plain-language request for a tune; `choice` in [0, 1) picks the phrasing."""
+    templates = WITH_RHYTHM if rhythm else WITHOUT_RHYTHM
+    template = templates[int(choice * len(templates))]
+    a = "an" if rhythm and rhythm[0] in "aeiou" else "a"
+    return REQUEST.format(template.format(a=a, rhythm=rhythm, meter=meter, key=key_words(key)))
+
+
 # A title shared by more than this many tunes is generic ("Reel", "Minuet"), not an identity.
 MAX_TITLE_SHARE = 3
 
@@ -189,6 +224,29 @@ class AbcMusic(Project):
             header = (f"R:{rhythm}\n" if rhythm else "") + f"M:{meter}\nL:1/8\nK:{key}\n"
             yield EvalPrompt(id=name, prompt=header,
                              meta={"rhythm": rhythm, "meter": meter, "key": key})  # fmt: skip
+
+    def sft_examples(self, docs: Iterable[Doc]) -> Iterator[SFTExample]:
+        """Each tune (and each transposed copy, on the train split) as request -> full tune.
+
+        The answer always has every header the tune has, whatever header dropout did to the
+        pretraining text: the model should state the rhythm, meter and key it was asked for.
+        """
+        for doc in docs:
+            tune = self._tune(doc)
+            key = parse_key(tune.key)
+            if key is None:
+                continue  # can't describe a key we can't parse
+            ask = request(tune.rhythm, tune.meter, key, stable_unit_hash(doc.id, "request"))
+            yield SFTExample(prompt=ask, completion=tune.render(),
+                             meta={"rhythm": tune.rhythm, "meter": tune.meter, "key": tune.key})  # fmt: skip
+
+    def sft_eval_prompts(self, split: str) -> Iterator[EvalPrompt]:
+        """The same four requests as `eval_prompts`, in words instead of headers."""
+        for p in self.eval_prompts(split):
+            m = p.meta
+            key = parse_key(m["key"])
+            assert key is not None
+            yield EvalPrompt(id=p.id, prompt=request(m["rhythm"], m["meter"], key), meta=m)
 
     def graders(self) -> list[Grader]:
         from .graders import GRADERS

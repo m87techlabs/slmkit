@@ -29,6 +29,10 @@ train:
   eval_iters: 50
   eval_samples: 2
   sample_tokens: 400
+sft:
+  enabled: true             # `slm run` continues into SFT; `slm sft` runs it on its own
+  lr: 3.0e-4                # a third of pretraining's peak: adjust the model, don't overwrite it
+  epochs: 3
 eval:
   num_samples: 200
   seeds: [0, 1, 2]

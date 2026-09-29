@@ -95,9 +95,29 @@ adherence after SFT. The engine adds `novelty` (no 32-character copying from tra
 in-key by construction (random characters score 98.7%). Full account:
 [`docs/concepts/evaluation.md`](../../docs/concepts/evaluation.md).
 
+## SFT
+
+`sft_examples()` turns every tune (and every transposed copy, on train) into a plain-language request
+and the full tune as the answer:
+
+```
+% a jig in G major
+R:jig
+M:6/8
+L:1/8
+K:G
+…
+```
+
+The request is an ABC comment, and the answer always carries every header. Eight phrasings, all using
+only characters in the pretraining vocabulary (no capital `W`, no `?`; see
+[`tests/test_sft_requests.py`](tests/test_sft_requests.py)). `sft_eval_prompts()` asks for the same
+four tunes as `eval_prompts()`, in words. Result: parity with the base model given headers, plus
+tunes that finish (98%) and end on the tonic more often ([sft.md](../../docs/concepts/sft.md) §4).
+
 ## Experiments
 
 | File | Model | Purpose |
 |---|---|---|
-| [`baseline.yaml`](experiments/baseline.yaml) | `nano` (0.85M), char | the first run: prove the pipeline (best val 1.2564 after 30M tokens, 0.01 GPU-h; **1.812 bpc** on full validation) |
+| [`baseline.yaml`](experiments/baseline.yaml) | `nano` (0.85M), char | the first run: prove the pipeline (best val 1.2564 after 30M tokens, 0.01 GPU-h; **1.812 bpc** on full validation). `sft.enabled`: fine-tuned in 27 s to parity with header prompts |
 | [`bpe512.yaml`](experiments/bpe512.yaml) | `nano`, BPE 512 | the tokenizer A/B: identical to baseline except the tokenizer (**1.824 bpc**; see [tokenization.md §6](../../docs/concepts/tokenization.md)) |
