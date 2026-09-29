@@ -422,32 +422,35 @@ uv run slm eval run-749d          # your char baseline run (IDs from `slm runs l
 ```
 ```
 run-749d028accd4 (abc-baseline) · best · step 916 · 3 seeds × 200 samples
-  model    seed 0: ended 0.920  length 280.840  plays 0.615  bar_accuracy 0.686  ends_on_tonic 0.240  novelty 0.998
+  model    seed 0: ended 0.880  length 287.170  plays 0.630  bar_accuracy 0.712  ends_on_tonic 0.240  novelty 0.998
   …
 metric                       model    baseline (token frequencies)
-ended                0.920 ± 0.005                   0.923 ± 0.018
-length             279.462 ± 6.439                215.237 ± 23.074
-plays                0.643 ± 0.025                   0.063 ± 0.018
-bar_accuracy         0.677 ± 0.011                   0.047 ± 0.012
-ends_on_tonic        0.188 ± 0.058                   0.152 ± 0.006
-novelty              0.999 ± 0.000                   1.000 ± 0.000
+ended                0.907 ± 0.025                   0.923 ± 0.018
+length            275.915 ± 14.369                215.237 ± 23.074
+plays                0.647 ± 0.014                   0.063 ± 0.018
+bar_accuracy         0.708 ± 0.012                   0.047 ± 0.012
+ends_on_tonic        0.212 ± 0.030                   0.152 ± 0.006
+novelty              0.998 ± 0.001                   1.000 ± 0.000
 
-report: ~/slm/runs/run-749d028accd4/eval/ev-a844801d43.json
+report: ~/slm/runs/run-749d028accd4/eval/ev-144df0a282.json
 ```
 
 About 25 seconds on the GPU: 600 samples from the model, 600 from the baseline, every one graded.
 
 **Read it against the baseline column,** which is tokens drawn at random by training frequency:
 
-- `plays` and `bar_accuracy` are 10× and 14× the baseline: real learning.
-- `ended` matches the baseline for a trivial reason: random draws hit `<eos>` within 600 tokens ~91%
+- `plays` and `bar_accuracy` are 10× and 15× the baseline: real learning.
+- `ended` roughly matches the baseline for a trivial reason: random draws hit `<eos>` within 600 tokens ~91%
   of the time. On its own it says nothing.
 - `novelty` is ~1.0 for random text too: a guard against copying, not a score.
 - `ends_on_tonic` barely beats the baseline's ~1-in-7 (C.4).
 
-**Run it again** and you get `ev-a844801d43 already exists`: the report ID hashes the settings, the
-checkpoint and the graders' source code, so identical evaluations are reused, and a changed grader
-automatically forces a fresh one. Same seeds also give identical numbers: evaluation is reproducible.
+**Run it again** and you get `ev-144df0a282 already exists`: the report ID hashes the run, the
+checkpoint, the settings, the prompt texts and the graders' source code, so identical evaluations are
+reused, and a changed prompt or grader automatically forces a fresh one. Same seeds also give identical
+numbers: evaluation is reproducible.
+
+(These are the numbers with the corrected prompts, re-measured in Phase E; see C.6.)
 
 ---
 
@@ -455,36 +458,45 @@ automatically forces a fresh one. Same seeds also give identical numbers: evalua
 
 ```bash
 uv run slm eval run-f79b                       # the BPE run
-uv run slm runs compare run-749d run-f79b
+uv run slm runs compare run-749d run-f79b --prompts headers
 ```
 ```
-run                          run-749d028a             run-f79bc951
-name                         abc-baseline               abc-bpe512
-tokenizer                            char                  bpe 512
-best val loss                      1.2564                   2.3531
-best val bpc                            -                    1.826
-eval              ev-a844801d43 (3 seeds)  ev-a844801d43 (3 seeds)
-plays                       0.643 ± 0.025            0.505 ± 0.005
-bar_accuracy                0.677 ± 0.011            0.728 ± 0.007
-ends_on_tonic               0.188 ± 0.058            0.203 ± 0.043
-novelty                     0.999 ± 0.000            0.985 ± 0.004
-…
+run                                   run-749d028a                      run-f79bc951
+name                                  abc-baseline                        abc-bpe512
+stage                                     pretrain                          pretrain
+model                                         nano                              nano
+tokenizer                                     char                           bpe 512
+seed                                          1337                              1337
+tokens                                       30.0M                             30.0M
+GPU-h                                         0.01                              0.01
+best val loss                               1.2564                            2.3531
+best val bpc                                     -                             1.826
+eval              ev-144df0a282 (headers, 3 seeds)  ev-fedddba9a1 (headers, 3 seeds)
+ended                                0.907 ± 0.025                     0.950 ± 0.013
+length                            275.915 ± 14.369                  302.323 ± 15.737
+plays                                0.647 ± 0.014                     0.492 ± 0.026
+bar_accuracy                         0.708 ± 0.012                     0.733 ± 0.008
+ends_on_tonic                        0.212 ± 0.030                     0.190 ± 0.043
+novelty                              0.998 ± 0.001                     0.987 ± 0.004
 ```
+
+`--prompts headers` picks each run's latest header-prompt report; without it, `compare` shows the
+latest report of any kind.
 
 (The char run shows `-` for bpc only because it was trained before the trainer reported bpc; its
 full-validation figure is 1.812.)
 
-Bits per character called char and BPE a tie. The graders show a trade-off: char plays more often,
-BPE gets more bars right, and BPE copies slightly more (1.5% of 32-character windows). Each gap is
-several times the sampling spread. Whether it survives different *training* seeds is Phase F's
-question.
+Bits per character called char and BPE a tie. The graders don't: char plays far more often (a gap of
+about eight times the sampling spread), BPE gets slightly more bars right (about twice the spread, the
+edge of what 3 seeds resolve), and BPE copies slightly more (1.3% of 32-character windows). Whether
+these survive different *training* seeds is Phase F's question.
 
 ---
 
 ## C.4 Investigate a suspicious number: ends on the tonic
 
 A 19% tonic rate against 80% for real tunes looked like a possible grader bug, so the endings were
-counted directly (80 samples of the char model):
+counted directly (80 samples of the char model, with the original 4/4 prompts of C.6):
 
 ```
 reel-D      [('ended D', 5), ('ended A', 4), ('ended F#', 4), ('ended G', 2), ('ended E', 2), ('cut   G', 1)]
@@ -506,8 +518,8 @@ the model. It was removed. The baseline column is what caught it (evaluation.md 
 
 ## C.5 Why samples fail to play
 
-Of 200 samples, 77 (char) and 101 (BPE) don't play. The `abc2midi` errors behind them are grammar
-slips, not garbage:
+Of 200 samples (original prompts), 77 (char) and 101 (BPE) don't play. The `abc2midi` errors behind
+them are grammar slips, not garbage:
 
 | Cause | Char | BPE |
 |---|---|---|
@@ -517,6 +529,45 @@ slips, not garbage:
 | a tie to nothing | 13 | 14 |
 
 `plays` is strict: any `Error` line fails the sample, even ones `abc2midi` recovers from.
+
+---
+
+## C.6 Found in Phase E: the prompts asked for meters the corpus doesn't have
+
+The first eval prompts asked for a reel and a hornpipe in **4/4**. Listening to exported samples in
+Phase E turned up a well-formed 2/4 hornpipe that scored 0 on bars, because the plain-English request
+"a hornpipe in A major" never mentioned 4/4 but the grader checked it. Count what the corpus holds:
+
+```bash
+uv run python - <<'PY'
+import json, collections
+from slmkit import artifacts
+d = artifacts.find_artifact("ds-f4f721a6c0e4")          # the dataset, from `slm lineage run-749d`
+c = collections.Counter()
+for line in open(d / "train.jsonl"):
+    m = json.loads(line)["meta"]
+    c[(m["rhythm"], m["meter"])] += 1
+for r in ("reel", "hornpipe", "jig"):
+    print(r, {mm: v for (rr, mm), v in c.most_common() if rr == r})
+PY
+```
+```
+reel {'2/2': 1173, '2/4': 718, '4/4': 9}
+hornpipe {'2/4': 674, '2/2': 580, '4/4': 27}
+jig {'6/8': 1267, '9/8': 69, '2/4': 18, '2/2': 13}
+```
+
+9 of 1,900 reels are in 4/4. Asked "a reel in D major, 4/4 time", the fine-tuned model wrote `M:2/4` in
+48 of 50 samples: it can't be talked out of what its data says reels are. A base model copies an
+`M:4/4` header, so header prompts hid the problem.
+
+**Fixed (Phase E):** the prompts ask for each rhythm's most common form (reel 2/2, hornpipe 2/4 with
+`L:1/16`), every plain-English request states the meter, and the eval ID hashes the prompt text. Before,
+it hashed only the prompt *kind*, so changed prompts would have reused stale reports. Every number in
+C.2, C.3 and D.3 was re-measured; C.4 and C.5 describe the original samples.
+
+**Why it matters:** an eval prompt is part of the measurement. Check that the training data contains
+what you ask for (evaluation.md §6).
 
 ---
 
@@ -651,32 +702,42 @@ uv run slm eval run-9b89                   # SFT model, asked in words (auto for
 
 | | Base + header prompt | Base + words | **SFT + words** |
 |---|---|---|---|
-| plays | 0.643 ± 0.025 | 0.413 ± 0.051 | **0.635** ± 0.059 |
-| bar_accuracy | 0.677 ± 0.011 | 0.268 ± 0.025 | **0.689** ± 0.011 |
-| ends_on_tonic | 0.188 ± 0.058 | 0.132 ± 0.010 | **0.292** ± 0.046 |
-| ended | 0.920 ± 0.005 | 0.830 ± 0.013 | **0.982** ± 0.010 |
+| plays | 0.647 ± 0.014 | 0.418 ± 0.032 | **0.730** ± 0.048 |
+| bar_accuracy | 0.708 ± 0.012 | 0.256 ± 0.020 | **0.851** ± 0.023 |
+| ends_on_tonic | 0.212 ± 0.030 | 0.137 ± 0.003 | **0.340** ± 0.026 |
+| ended | 0.907 ± 0.025 | 0.817 ± 0.068 | **0.982** ± 0.006 |
 
 ```bash
-uv run slm runs compare run-749d run-9b89
+uv run slm runs compare run-749d run-9b89 --prompts sft
 ```
 ```
 run                               run-749d028a                  run-9b890db6
 name                              abc-baseline              abc-baseline-sft
 stage                                 pretrain                           sft
-…
-eval              ev-7925f26eaf (sft, 3 seeds)  ev-0a9ec0eef6 (sft, 3 seeds)
-plays                            0.413 ± 0.051                 0.635 ± 0.059
-bar_accuracy                     0.268 ± 0.025                 0.689 ± 0.011
+model                                     nano                          nano
+tokenizer                                 char                          char
+seed                                      1337                          1337
+tokens                                   30.0M                         16.8M
+GPU-h                                     0.01                          0.01
+best val loss                           1.2564                        1.1092
+best val bpc                                 -                             -
+eval              ev-b921034aed (sft, 3 seeds)  ev-0ddc32e2a9 (sft, 3 seeds)
+ended                            0.817 ± 0.068                 0.982 ± 0.006
+length                        356.162 ± 23.809               259.345 ± 4.707
+plays                            0.418 ± 0.032                 0.730 ± 0.048
+bar_accuracy                     0.256 ± 0.020                 0.851 ± 0.023
+ends_on_tonic                    0.137 ± 0.003                 0.340 ± 0.026
+novelty                          0.981 ± 0.006                 0.998 ± 0.001
 ```
-
-(`compare` shows each run's latest report: for the base run, that's the words-prompt one.)
 
 **Reading it:**
 - **Base + words** collapses: without SFT, the model doesn't understand a request.
-- **SFT + words reaches parity** with base + headers on plays and bars. That is the M2 exit criterion
-  (DESIGN §5.1: parity is the pass mark, not a win). SFT's contribution is the interface.
+- **SFT + words passes parity** with base + headers, the M2 exit criterion (DESIGN §5.1), and goes past
+  it on plays and bars. Part of that is more training: SFT adds 16.8M tokens on the same tunes.
 - It also **finishes** 98% of the time and ends on the tonic more often. SFT examples are always
   complete tunes.
+- These are the Phase E re-measurements (C.6). The first measurement showed bare parity (bars 0.689 vs
+  0.677) because its requests asked for 4/4 reels and hornpipes without saying so.
 
 ---
 
@@ -684,5 +745,6 @@ bar_accuracy                     0.268 ± 0.025                 0.689 ± 0.011
 
 - [x] `make test` (164) and `make lint` pass; the mask test proves zero loss and gradient on prompts.
 - [x] `slm sft` fine-tunes from the pretrained best checkpoint, resumably; `slm run` chains both.
-- [x] SFT + plain-language requests reaches parity with base + headers on plays and bars.
+- [x] SFT + plain-language requests reaches parity with base + headers on plays and bars (re-measured
+      in Phase E: it exceeds it).
 - [ ] **You** have run D.1–D.3 and the output matches.

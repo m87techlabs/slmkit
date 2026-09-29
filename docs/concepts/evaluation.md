@@ -21,7 +21,7 @@ Four ideas make grader numbers trustworthy: **baselines**, **calibration**, **se
 
 ```
 for each sampling seed (0, 1, 2):
-    for each eval prompt (reel in D, jig in G, hornpipe in A, air in E minor):
+    for each eval prompt (reel in D 2/2, jig in G 6/8, hornpipe in A 2/4, air in E minor 3/4):
         generate ~50 samples from the best checkpoint
     score every sample with every grader
     average each metric over the seed's 200 samples
@@ -62,11 +62,14 @@ seeds × 200 samples:
 
 | Metric | Char model | Char baseline | BPE-512 model | BPE baseline | Human corpus (§3) |
 |---|---|---|---|---|---|
-| plays | **0.643** ± 0.025 | 0.063 ± 0.018 | **0.505** ± 0.005 | 0.140 ± 0.035 | ~1.0 |
-| bar_accuracy | **0.677** ± 0.011 | 0.047 ± 0.012 | **0.728** ± 0.007 | 0.053 ± 0.005 | 0.990 |
-| ends_on_tonic | 0.188 ± 0.058 | 0.152 ± 0.006 | 0.203 ± 0.043 | 0.148 ± 0.014 | 0.805 |
-| novelty | 0.999 ± 0.000 | 1.000 ± 0.000 | 0.985 ± 0.004 | 1.000 ± 0.000 | — |
-| ended | 0.920 ± 0.005 | 0.923 ± 0.018 | 0.955 ± 0.013 | 0.988 ± 0.010 | — |
+| plays | **0.647** ± 0.014 | 0.063 ± 0.018 | **0.492** ± 0.026 | 0.140 ± 0.035 | ~1.0 |
+| bar_accuracy | **0.708** ± 0.012 | 0.047 ± 0.012 | **0.733** ± 0.008 | 0.053 ± 0.005 | 0.990 |
+| ends_on_tonic | 0.212 ± 0.030 | 0.152 ± 0.006 | 0.190 ± 0.043 | 0.148 ± 0.014 | 0.805 |
+| novelty | 0.998 ± 0.001 | 1.000 ± 0.000 | 0.987 ± 0.004 | 1.000 ± 0.000 | — |
+| ended | 0.907 ± 0.025 | 0.923 ± 0.018 | 0.950 ± 0.013 | 0.988 ± 0.010 | — |
+
+(Measured with the corrected prompts of §6. The first version of this table asked for a 4/4 reel and
+hornpipe, and read 0.643 / 0.677 for char and 0.505 / 0.728 for BPE.)
 
 Reading it:
 
@@ -77,19 +80,20 @@ Reading it:
   within 600 draws about 91% of the time. A metric the baseline matches for a trivial reason tells you
   nothing on its own.
 - **novelty** is near 1.0 for everything, including random characters, which are perfectly novel. It
-  is a guard against copying, not a score to maximize. BPE's 0.985 means 1.5% of its 32-character
-  windows appear verbatim in training, against 0.1% for char, consistent with BPE's faster
+  is a guard against copying, not a score to maximize. BPE's 0.987 means 1.3% of its 32-character
+  windows appear verbatim in training, against 0.2% for char, consistent with BPE's faster
   overfitting in Phase B.
 - **ends_on_tonic** is barely above the baseline for either model (§5).
 
 **Char vs BPE, graded.** Bits per character called the two tokenizers a tie (1.812 vs 1.824). The
-graders show a trade-off that loss can't: char's samples play more often (0.64 vs 0.51), BPE's get more
-bars right (0.73 vs 0.68). Both gaps are several times the sampling spread, so they are real for
-*these two models*. Whether they hold across training seeds is what Phase F measures.
+graders show what loss can't: char's samples play far more often (0.65 vs 0.49, a gap of about eight
+times the spread, so real for *these two models*). BPE gets slightly more bars right (0.73 vs 0.71), but
+that gap is only about twice the spread, which is the edge of what 3 sampling seeds can resolve.
+Whether either holds across training seeds is what Phase F measures.
 
 **Why samples fail to play.** `plays` is strict: any `Error` line from `abc2midi` fails the sample,
-including ones it recovers from. Tallying the errors in 200 samples per model shows grammar slips, not
-garbage:
+including ones it recovers from. Tallying the errors in 200 samples per model (with the original
+prompts) shows grammar slips, not garbage:
 
 | Cause (abc2midi message) | Char | BPE |
 |---|---|---|
@@ -135,7 +139,7 @@ Sampling is random, so the same checkpoint scores differently on every draw of 2
 repeats the whole evaluation with 3 sampling seeds and reports the spread (standard deviation):
 
 ```
-plays   0.615 · 0.660 · 0.655   → 0.643 ± 0.025
+plays   0.630 · 0.655 · 0.655   → 0.647 ± 0.014
 ```
 
 A difference between two runs smaller than about twice this spread is not a difference. That is why
@@ -154,9 +158,9 @@ Phase F uses both: three training seeds per configuration, each evaluated with t
 
 ## 5. Always read the samples: the tonic puzzle
 
-Both models end on the tonic about 19–20% of the time, against 80.5% for real tunes and 15% for the
+Both models end on the tonic about 19–21% of the time, against 80.5% for real tunes and 15% for the
 baseline. A number that low deserves suspicion of the grader before the model, so the samples were
-checked.
+checked (with the original prompts; §6).
 
 **The grader is right.** The report's examples score correctly by hand: a reel in D ending `d2 :|`
 passes, and a hornpipe in A ending on `c` (C♯, the third) fails. The final notes of 80 char-model
@@ -180,7 +184,7 @@ F♯. Almost any ending is in key by construction. The metric measured the notat
 was removed. Without the baseline column, it would have gone into this page as a finding.
 
 **What the tonic result does mean.** The baseline's 0.15 is roughly 1 in 7: a random note of the scale.
-The models' 0.19–0.20 is barely better than that. Ending on the tonic is a long-range pattern: the last
+The models' 0.19–0.21 is barely better than that. Ending on the tonic is a long-range pattern: the last
 note has to refer back to the key stated at the top, hundreds of characters earlier. A 0.86M-parameter
 model captures the local rules (bar lengths, note shapes) far better than that kind of long-range
 structure. That makes `ends_on_tonic` one of the metrics to watch as models grow in Phase F.
@@ -190,7 +194,39 @@ show how often.
 
 ---
 
-## 6. What a grader can't tell you
+## 6. Ask for what exists: a flaw found in Phase E
+
+The first eval prompts asked for a reel and a hornpipe in **4/4**. That looks reasonable: 4/4 is the
+most common meter in music generally. It was found wrong in Phase E, while listening to exported
+samples, when a fine-tuned model asked for "a hornpipe in A major" wrote a well-formed 2/4 hornpipe
+and scored 0 on bars. Counting the training corpus showed why:
+
+| Rhythm | Training tunes | Meters |
+|---|---|---|
+| reel | 1,900 | 2/2 × 1,173 · 2/4 × 718 · **4/4 × 9** |
+| hornpipe | 1,281 | 2/4 × 674 · 2/2 × 580 · **4/4 × 27** |
+
+A 4/4 reel barely exists in these tune books. Two things went wrong because of it:
+
+- **The request didn't state what the grader checked.** The plain-English prompt said "a hornpipe in
+  A major" and the grader checked for 4/4. A 2/4 answer is a correct answer to that request.
+- **Stating it didn't help.** Asked "a reel in D major, 4/4 time", the fine-tuned model wrote `M:2/4`
+  in 48 of 50 samples. It can't be talked out of what its data says reels are (sft.md §5). A base
+  model given a `M:4/4` header copies it, so header prompts hid the problem.
+
+The fix: each prompt asks for the corpus's **most common** form of that rhythm (reel 2/2, hornpipe
+2/4 with `L:1/16`), and every plain-language request states the meter, since the bars grader checks it
+(`test_sft_eval_prompts_state_what_the_graders_check`). The eval report ID now hashes the prompt text
+too; before, only the prompt *kind* was hashed, and changed prompts would have silently reused the old
+reports. All Phase C and D numbers were re-measured.
+
+**The lesson:** an eval prompt is part of the measurement. Before asking a model for something, check
+the training data contains it. Asking for what the corpus doesn't have measures something else:
+whether a request can override the data, a harder and different question.
+
+---
+
+## 7. What a grader can't tell you
 
 - **Musicality.** A tune can play, have perfect bars and end on the tonic while being dull or
   directionless. Graders set a floor; listening (Phase E) is still part of the exit criteria.

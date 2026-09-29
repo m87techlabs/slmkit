@@ -63,10 +63,19 @@ def key_words(key: Key) -> str:
     return f"{key.tonic} {MODE_WORDS[key.mode]}"
 
 
-def request(rhythm: str | None, meter: str, key: Key, choice: float = 0.0) -> str:
-    """A plain-language request for a tune; `choice` in [0, 1) picks the phrasing."""
+# Eval requests must state everything the graders check. The bars grader checks the meter, and
+# a hornpipe asked for without one may fairly come back in 2/4 instead of 4/4.
+EVAL_WITH_RHYTHM = WITH_RHYTHM[3]
+EVAL_WITHOUT_RHYTHM = WITHOUT_RHYTHM[0]
+
+
+def request(
+    rhythm: str | None, meter: str, key: Key, choice: float = 0.0, template: str | None = None
+) -> str:
+    """A plain-language request for a tune; `choice` in [0, 1) picks the phrasing, unless a
+    `template` is given."""
     templates = WITH_RHYTHM if rhythm else WITHOUT_RHYTHM
-    template = templates[int(choice * len(templates))]
+    template = template or templates[int(choice * len(templates))]
     a = "an" if rhythm and rhythm[0] in "aeiou" else "a"
     return REQUEST.format(template.format(a=a, rhythm=rhythm, meter=meter, key=key_words(key)))
 
@@ -215,13 +224,16 @@ class AbcMusic(Project):
     def eval_prompts(self, split: str) -> Iterator[EvalPrompt]:
         # Header prefixes: the model continues with a tune that should fit them. `meta` is what
         # the graders check against (so the same graders measure prompt adherence after SFT).
-        for name, rhythm, meter, key in (
-            ("reel-D", "reel", "4/4", "D"),
-            ("jig-G", "jig", "6/8", "G"),
-            ("hornpipe-A", "hornpipe", "4/4", "A"),
-            ("air-Em", None, "3/4", "Em"),
+        # Each asks for the corpus's most common form of that rhythm. A 4/4 reel (9 of 1,900
+        # training reels) tests something else: whether a request can override what the model
+        # has seen, which base models copy from a header and fine-tuned ones don't (sft.md §5).
+        for name, rhythm, meter, unit, key in (
+            ("reel-D", "reel", "2/2", "1/8", "D"),
+            ("jig-G", "jig", "6/8", "1/8", "G"),
+            ("hornpipe-A", "hornpipe", "2/4", "1/16", "A"),
+            ("air-Em", None, "3/4", "1/8", "Em"),
         ):
-            header = (f"R:{rhythm}\n" if rhythm else "") + f"M:{meter}\nL:1/8\nK:{key}\n"
+            header = (f"R:{rhythm}\n" if rhythm else "") + f"M:{meter}\nL:{unit}\nK:{key}\n"
             yield EvalPrompt(id=name, prompt=header,
                              meta={"rhythm": rhythm, "meter": meter, "key": key})  # fmt: skip
 
@@ -246,7 +258,9 @@ class AbcMusic(Project):
             m = p.meta
             key = parse_key(m["key"])
             assert key is not None
-            yield EvalPrompt(id=p.id, prompt=request(m["rhythm"], m["meter"], key), meta=m)
+            template = EVAL_WITH_RHYTHM if m["rhythm"] else EVAL_WITHOUT_RHYTHM
+            yield EvalPrompt(id=p.id, prompt=request(m["rhythm"], m["meter"], key, template=template),
+                             meta=m)  # fmt: skip
 
     def graders(self) -> list[Grader]:
         from .graders import GRADERS

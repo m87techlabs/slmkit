@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import torch
 from typer.testing import CliRunner
 
@@ -14,6 +15,7 @@ from slmkit.eval.runner import EvalSettings, _split_counts, aggregate, evaluate
 from slmkit.graders import completion, ngram_novelty, parse_rate
 from slmkit.inference import load_run
 from slmkit.project_api import EvalPrompt
+from slmkit.registry import load_project
 from slmkit.train.trainer import Trainer
 
 PROMPT = EvalPrompt(id="p", prompt="R:reel\n")
@@ -102,3 +104,15 @@ def test_runs_compare_shows_both_runs(toy_repo: Path, slm_home: Path) -> None:
     assert out.exit_code == 0, out.output
     assert a[:12] in out.output and b[:12] in out.output
     assert "novelty" in out.output  # from a's eval report; b shows "-"
+
+
+def test_changing_a_prompt_changes_the_eval_id(
+    toy_repo: Path, slm_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = load_run(_trained(), "best", torch.device("cpu"))
+    first, _ = evaluate(run, SETTINGS, torch.device("cpu"), log=lambda _: None)
+    project_cls = type(load_project("toy", {}, slm_home))
+    monkeypatch.setattr(project_cls, "eval_prompts",
+                        lambda self, split: iter([EvalPrompt(id="p", prompt="abd")]))  # fmt: skip
+    again, _ = evaluate(run, SETTINGS, torch.device("cpu"), log=lambda _: None)
+    assert again["eval_id"] != first["eval_id"]

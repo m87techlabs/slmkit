@@ -450,6 +450,9 @@ RUN_IDS = typer.Argument(..., help="Two or more run IDs (or unique prefixes).")
 @_friendly_errors
 def runs_compare(
     run_ids: list[str] = RUN_IDS,
+    prompts: str = typer.Option(
+        "latest", help="Which eval report to show: headers, sft, or latest (any kind)."
+    ),
 ) -> None:
     """Side by side: config, training result and latest eval report of each run."""
     import json
@@ -480,7 +483,7 @@ def runs_compare(
             # bpc is absent for runs trained before it existed, and None for SFT (masked loss).
             "best val bpc": f"{best['val_bpc']:.3f}" if best.get("val_bpc") is not None else "-",
         }
-        report = latest_report(run_dir)
+        report = latest_report(run_dir, None if prompts == "latest" else prompts)
         if report:
             kind = report.get("prompts_kind", "headers")
             col["eval"] = f"{report['eval_id']} ({kind}, {len(report['settings']['seeds'])} seeds)"

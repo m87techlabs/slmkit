@@ -104,26 +104,32 @@ guards and logging, and duplicated infrastructure drifts apart.
 ## 4. Did it work? Parity is the pass mark
 
 Measured on `abc_music/baseline` (char, `nano`), 3 sampling seeds × 200 samples each, graded by the
-same graders against what was **asked**:
+same graders against what was **asked**. The requests are "a reel in D major, 2/2 time", "a jig in G
+major, 6/8 time", "a hornpipe in A major, 2/4 time" and "a tune in 3/4 time in E minor", or the same
+as ABC headers:
 
 | | Base model, header prompt | Base model, asked in words | **SFT model, asked in words** |
 |---|---|---|---|
-| plays | 0.643 ± 0.025 | 0.413 ± 0.051 | **0.635** ± 0.059 |
-| bar_accuracy | 0.677 ± 0.011 | 0.268 ± 0.025 | **0.689** ± 0.011 |
-| ends_on_tonic | 0.188 ± 0.058 | 0.132 ± 0.010 | **0.292** ± 0.046 |
-| ended (finished itself) | 0.920 ± 0.005 | 0.830 ± 0.013 | **0.982** ± 0.010 |
-| novelty | 0.999 | 0.991 | 0.998 |
+| plays | 0.647 ± 0.014 | 0.418 ± 0.032 | **0.730** ± 0.048 |
+| bar_accuracy | 0.708 ± 0.012 | 0.256 ± 0.020 | **0.851** ± 0.023 |
+| ends_on_tonic | 0.212 ± 0.030 | 0.137 ± 0.003 | **0.340** ± 0.026 |
+| ended (finished itself) | 0.907 ± 0.025 | 0.817 ± 0.068 | **0.982** ± 0.006 |
+| novelty | 0.998 | 0.981 | 0.998 |
 
 Reading it:
 
 - **The middle column is why SFT exists.** Asked in words, the base model's bar accuracy falls from
-  0.68 to 0.27: it doesn't understand the request.
-- **SFT reaches parity** with the base model's header prompt on playing and bars. That is the pass mark
-  DESIGN §5.1 set, and it is what was expected. Header dropout already taught the base model to follow
-  headers, so SFT's contribution is the **interface**, not better music.
-- **Two side effects are real improvements.** SFT examples are always complete tunes, so the fine-tuned
-  model finishes 98% of the time, and ends on the tonic more often (0.29 vs 0.19, a gap of about twice
-  the spread). One training seed, though; Phase F repeats it.
+  0.71 to 0.26: it doesn't understand the request.
+- **SFT passes the parity mark** that DESIGN §5.1 set, and goes past it: bars 0.85 against the header
+  prompt's 0.71, and plays 0.73 against 0.65. SFT examples are always complete tunes with every header,
+  so the fine-tuned model finishes 98% of the time and ends on the tonic more often (0.34 vs 0.21).
+- **Part of that gain is simply more training.** SFT is 16.8M more tokens on the same tunes, 56% on top
+  of pretraining's 30M. Continuing *pretraining* for the same tokens would separate "more training" from
+  "request → answer training". One training seed, too; Phase F repeats it.
+
+(A first version of this table showed bare parity, bars 0.689 vs 0.677. Its requests didn't state the
+meter the grader checked, and asked for a 4/4 reel and hornpipe, which the corpus almost never has. See
+evaluation.md §6 and §5 below.)
 
 What it looks like. Both samples were asked, in words, for "a jig in G major":
 
@@ -144,8 +150,13 @@ F EFG A2 B | cde d2 B AFC | …                K:G
 
 - **Teach new music.** Everything the fine-tuned model writes, it learned in pretraining; SFT redirects
   it. That's why graders show parity rather than a jump.
+- **Override its data.** Asked for "a reel in D major, 4/4 time", the fine-tuned model writes `M:2/4`
+  in 48 of 50 samples: 4/4 reels are 9 of the corpus's 1,900. Given no meter, it picks between the two
+  real reel meters in roughly the corpus's proportion (2/2 : 2/4 = 36 : 14, against 62 : 38 in
+  training). SFT taught it to read the request, but only for requests the data can answer. A base model
+  given `M:4/4` as a header just copies it, which is why header prompts hid this.
 - **Understand arbitrary English.** The model has seen eight phrasings built from a few words. "Give me
   something cheerful" means nothing to it. The requests are a small, closed language, and only
   scale changes that.
-- **Fix the tonic problem.** Ending on the tonic improved, but 0.29 is still far below real tunes' 0.80.
+- **Fix the tonic problem.** Ending on the tonic improved, but 0.34 is still far below real tunes' 0.80.
   That's a model-size limit (evaluation.md §5), which Phase F measures.

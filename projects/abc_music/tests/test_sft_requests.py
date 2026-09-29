@@ -54,3 +54,11 @@ def test_sft_eval_prompts_mirror_the_header_prompts() -> None:
     headers = list(PROJECT.eval_prompts("val"))
     assert [p.id for p in words] == [p.id for p in headers]
     assert [p.meta for p in words] == [p.meta for p in headers]
+
+
+def test_sft_eval_prompts_state_what_the_graders_check() -> None:
+    """The bars grader checks the meter and the tonic grader the key, so every eval request
+    must say both; a model can't be marked down for a requirement nobody stated."""
+    for p in PROJECT.sft_eval_prompts("val"):
+        assert f"{p.meta['meter']} time" in p.prompt, p.prompt
+        assert p.meta["key"][0] in p.prompt, p.prompt

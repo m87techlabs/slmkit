@@ -161,17 +161,20 @@ def evaluate(
         ngram_novelty(d.text for d in read_docs(dataset / "train.jsonl")),
     ]
 
-    # The ID covers the settings, the checkpoint and the graders' own source code, so changing a
-    # grader invalidates old reports instead of silently reusing numbers it no longer produces.
+    # The ID covers the run, its checkpoint, the settings, the prompts themselves and the
+    # graders' own source code, so changing a prompt or a grader invalidates old reports instead
+    # of silently reusing numbers they no longer produce.
     eval_id = (
         "ev-"
         + stable_hash(
             {
+                "run": run.run_id,
                 "settings": asdict(s),
                 "checkpoint": run.checkpoint,
                 "step": run.state["step"],
                 "baseline": baseline,
                 "prompts": kind,
+                "prompt_items": [[p.id, p.prompt, p.meta] for p in prompts],
                 "graders": [inspect.getsource(g) for g in graders],
             }
         )[:10]
@@ -229,9 +232,15 @@ def evaluate(
     return saved, path
 
 
-def latest_report(run_dir: Path) -> dict[str, Any] | None:
+def latest_report(run_dir: Path, prompts_kind: str | None = None) -> dict[str, Any] | None:
+    """The most recent eval report, optionally only among those using `prompts_kind` prompts
+    ("headers" or "sft")."""
     reports = sorted((run_dir / EVAL_DIR).glob("ev-*.json"), key=lambda p: p.stat().st_mtime)
-    return json.loads(reports[-1].read_text()) if reports else None
+    for path in reversed(reports):
+        report: dict[str, Any] = json.loads(path.read_text())
+        if prompts_kind is None or report.get("prompts_kind", "headers") == prompts_kind:
+            return report
+    return None
 
 
 def fmt(stat: dict[str, float]) -> str:

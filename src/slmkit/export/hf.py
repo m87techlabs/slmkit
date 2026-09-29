@@ -303,7 +303,8 @@ def export_run(
     run_manifest = artifacts.read_manifest(run.run_dir)
     status = read_status(run.run_dir) or {}
     params = count_parameters(run.model)
-    report = latest_report(run.run_dir)
+    # The card reports the eval that matches how the model is meant to be prompted.
+    report = latest_report(run.run_dir, "sft" if run.stage == "sft" else "headers")
     stats: dict[str, Any] = {
         "stage": run.stage,
         "checkpoint": run.checkpoint,
