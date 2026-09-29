@@ -1,0 +1,38 @@
+# The model-size A/B: identical to baseline.yaml except `model.preset` (nano -> micro, about 5.7x
+# the non-embedding parameters). Same data, context, batch, learning rate and token budget, so the
+# comparison is "more parameters at equal tokens", not "more parameters and more training".
+# The learning rate is not re-tuned for the larger size (DESIGN 4: LR doesn't transfer across
+# sizes); M3's scaling sweep does that. No SFT: this sweep compares pretraining.
+run:
+  name: abc-micro
+  seed: 1337
+  tracker: tensorboard
+project:
+  name: abc_music
+  args:
+    transpose_semitones: [-2, -1, 1, 2]
+    max_key_accidentals: 3
+    header_dropout: 0.4
+tokenizer:
+  type: char
+data:
+  block_size: 512
+  val_fraction: 0.1
+  append_eos: true
+model:
+  preset: micro
+  overrides: {dropout: 0.1}
+train:
+  preset: default
+  max_tokens: 30_000_000
+  batch_size: 64
+  lr: 1.0e-3
+  warmup_tokens: 1_000_000
+  eval_every_steps: 250
+  eval_iters: 50
+  eval_samples: 2
+  sample_tokens: 400
+eval:
+  num_samples: 200
+  seeds: [0, 1, 2]
+  temperature: 0.8

@@ -234,8 +234,10 @@ def model(
 
 
 def _train(experiment: str, set_: list[str] | None, device: str, max_minutes: float | None,
-           max_steps: int | None, stages: tuple[str, ...] = ("pretrain",)) -> None:  # fmt: skip
-    """Run the given stages in order; a stage that stops early ends the session there."""
+           max_steps: int | None, stages: tuple[str, ...] = ("pretrain",)) -> list[str] | None:  # fmt: skip
+    """Run the given stages in order; a stage that stops early ends the session there.
+
+    Returns the run IDs of the stages, or None if one stopped before completing."""
     from slmkit.train.guards import TrainingDiverged
     from slmkit.train.stage import sft_stage
     from slmkit.train.trainer import Trainer
@@ -243,6 +245,7 @@ def _train(experiment: str, set_: list[str] | None, device: str, max_minutes: fl
     exp = load_experiment(experiment, set_)
     typer.echo(f"{exp.address}:")
     pipeline.ensure_packed(exp, typer.echo)
+    done = []
     for kind in stages:
         stage = sft_stage(exp) if kind == "sft" else None
         trainer = Trainer(exp, stage=stage, device=device)
@@ -252,7 +255,9 @@ def _train(experiment: str, set_: list[str] | None, device: str, max_minutes: fl
             typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=3) from None
         if outcome != "complete":
-            return
+            return None
+        done.append(trainer.run_id)
+    return done
 
 
 DEVICE = typer.Option("auto", help="cuda, cpu, or auto (cuda when available).")
@@ -286,14 +291,22 @@ def run(
     device: str = DEVICE,
     max_minutes: float | None = MAX_MINUTES,
     max_steps: int | None = MAX_STEPS,
+    eval_: bool = typer.Option(True, "--eval/--no-eval", help="Evaluate each trained stage."),
 ) -> None:
-    """The whole pipeline: build missing data artifacts, pretrain, then SFT if `sft.enabled`.
+    """The whole pipeline: build missing data artifacts, pretrain, SFT if `sft.enabled`, then
+    evaluate each stage.
 
-    Every stage resumes if it has a checkpoint and is skipped if already complete.
+    Every stage resumes if it has a checkpoint and is skipped if already complete; an existing
+    eval report is reused. So re-running the same command after any interruption continues
+    where it stopped, which is what makes a sweep a plain loop over `slm run`.
     """
     exp = load_experiment(experiment, set_)
     stages = ("pretrain", "sft") if exp.config.sft.enabled else ("pretrain",)
-    _train(experiment, set_, device, max_minutes, max_steps, stages)
+    run_ids = _train(experiment, set_, device, max_minutes, max_steps, stages)
+    if eval_ and run_ids:
+        for rid in run_ids:
+            typer.echo("")
+            _evaluate(rid, device=device)
 
 
 @app.command()
@@ -409,6 +422,13 @@ def eval_(
     device: str = DEVICE,
 ) -> None:
     """Generate samples and grade them: every project grader plus novelty, mean ± spread."""
+    _evaluate(run_id, seeds=seeds, samples=samples, which=which, baseline=baseline,
+              prompts=prompts, device=device)  # fmt: skip
+
+
+def _evaluate(run_id: str, *, seeds: str | None = None, samples: int | None = None,
+              which: str = "best", baseline: bool = True, prompts: str = "auto",
+              device: str = "auto") -> None:  # fmt: skip
     from slmkit.config.schema import EvalConfig
     from slmkit.eval.runner import EvalSettings, evaluate, fmt
     from slmkit.inference import load_run
@@ -589,3 +609,42 @@ def serve(
                f"{exported.manifest['inputs']['run']} step {s['step']} · device {dev}")  # fmt: skip
     typer.echo(f"try: curl -s http://{host}:{port}/info")
     uvicorn.run(create_app(exported, dev), host=host, port=port, log_level="info")
+
+
+@runs_app.command("summary")
+@_friendly_errors
+def runs_summary(
+    project: str | None = typer.Option(None, help="Only this project's experiments."),
+    prompts: str = typer.Option(
+        "auto", help="Eval reports to use: headers, sft, or auto (sft for fine-tuned runs)."
+    ),
+) -> None:
+    """Every experiment, averaged over its training seeds: mean ± spread across runs."""
+    from slmkit.eval.runner import fmt
+    from slmkit.eval.summary import summarize
+
+    groups = summarize(prompts, project)
+    if not groups:
+        typer.echo("no complete runs yet under $SLM_HOME/runs")
+        return
+    cols: list[dict[str, str]] = []
+    metrics: list[str] = []
+    for g in groups:
+        col = {
+            "experiment": g.experiment,
+            "stage": g.stage,
+            "runs": f"{len(g.run_ids)} ({g.evaluated} evaluated)",
+            "seeds": ",".join(str(s) for s in sorted(g.seeds)),
+            "GPU-h": f"{g.gpu_hours:.2f}",
+            "eval prompts": g.eval_kind or "-",
+        }
+        for m, stat in g.stats.items():
+            # One run has no spread to show; "± 0.000" would claim a certainty it doesn't have.
+            col[m] = fmt(stat) if len(g.run_ids) > 1 else f"{stat['mean']:.3f} (1 run)"
+            if m not in metrics:
+                metrics.append(m)
+        cols.append(col)
+    rows = ["experiment", "stage", "runs", "seeds", "GPU-h", "eval prompts", *metrics]
+    width = max(18, *(len(v) for c in cols for v in c.values()))
+    for row in rows:
+        typer.echo(f"{row:<14}" + "".join(f"  {c.get(row, '-'):>{width}}" for c in cols))
