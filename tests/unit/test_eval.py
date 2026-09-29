@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 
 from slmkit.cli import app
 from slmkit.config import load_experiment
-from slmkit.eval.runner import EvalSettings, _split_counts, aggregate, evaluate
+from slmkit.eval.runner import EvalSettings, _split_counts, aggregate, evaluate, latest_report
 from slmkit.graders import completion, ngram_novelty, parse_rate
 from slmkit.inference import load_run
 from slmkit.project_api import EvalPrompt
@@ -116,3 +116,20 @@ def test_changing_a_prompt_changes_the_eval_id(
                         lambda self, split: iter([EvalPrompt(id="p", prompt="abd")]))  # fmt: skip
     again, _ = evaluate(run, SETTINGS, torch.device("cpu"), log=lambda _: None)
     assert again["eval_id"] != first["eval_id"]
+
+
+def test_latest_report_ignores_file_times(toy_repo: Path, slm_home: Path) -> None:
+    """A copied run directory has fresh mtimes; `latest` must follow the reports' own clocks."""
+    import dataclasses
+    import os
+
+    run = load_run(_trained(), "best", torch.device("cpu"))
+    _, old_path = evaluate(run, SETTINGS, torch.device("cpu"), log=lambda _: None)
+    later = dataclasses.replace(SETTINGS, num_samples=4)
+    new, _ = evaluate(run, later, torch.device("cpu"), log=lambda _: None)
+    data = json.loads(old_path.read_text())
+    data["created"] = "2000-01-01T00:00:00+00:00"  # the older report...
+    old_path.write_text(json.dumps(data))
+    os.utime(old_path)  # ...now has the newest file time, as after a copy
+    latest = latest_report(run.run_dir)
+    assert latest is not None and latest["eval_id"] == new["eval_id"]

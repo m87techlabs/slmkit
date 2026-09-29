@@ -234,10 +234,15 @@ def evaluate(
 
 def latest_report(run_dir: Path, prompts_kind: str | None = None) -> dict[str, Any] | None:
     """The most recent eval report, optionally only among those using `prompts_kind` prompts
-    ("headers" or "sft")."""
-    reports = sorted((run_dir / EVAL_DIR).glob("ev-*.json"), key=lambda p: p.stat().st_mtime)
-    for path in reversed(reports):
-        report: dict[str, Any] = json.loads(path.read_text())
+    ("headers" or "sft").
+
+    "Recent" is the report's own `created` time, not the file's mtime: copying a run directory
+    (a backup, `cp -r`, rsync without -t) resets mtimes and would pick an arbitrary report."""
+    reports: list[dict[str, Any]] = [
+        json.loads(p.read_text()) for p in (run_dir / EVAL_DIR).glob("ev-*.json")
+    ]
+    reports.sort(key=lambda r: _dt.datetime.fromisoformat(r["created"]))
+    for report in reversed(reports):
         if prompts_kind is None or report.get("prompts_kind", "headers") == prompts_kind:
             return report
     return None
