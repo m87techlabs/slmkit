@@ -252,3 +252,16 @@ class AbcMusic(Project):
         from .graders import GRADERS
 
         return list(GRADERS)
+
+    def render_sample(self, prompt: EvalPrompt, text: str) -> dict[str, bytes]:
+        """The tune as an `.abc` file any ABC app opens, and as MIDI to listen to, when abc2midi
+        can play it. A tune it can't play gets only the `.abc`, so the failure stays visible."""
+        from .graders import abc2midi
+
+        abc = f"X:1\nT:{prompt.id} (generated)\n{text}"
+        abc += "" if abc.endswith("\n") else "\n"
+        files = {".abc": abc.encode()}
+        midi, _errors = abc2midi(abc)
+        if midi is not None:
+            files[".mid"] = midi
+        return files

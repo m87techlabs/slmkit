@@ -72,6 +72,9 @@ class BPETokenizer(Tokenizer):
         # Hugging Face's own format: the export (M2 Phase E) can ship this file unchanged.
         self.hf.save(str(directory / TOKENIZER_FILE))
 
+    def to_hf(self) -> HFTokenizer:
+        return self.hf
+
     @classmethod
     def load(cls, directory: Path) -> BPETokenizer:
         return cls(HFTokenizer.from_file(str(directory / TOKENIZER_FILE)))

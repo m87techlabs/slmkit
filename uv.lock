@@ -2111,6 +2111,7 @@ chess = [
     { name = "python-chess" },
 ]
 dev = [
+    { name = "httpx" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -2133,6 +2134,7 @@ wandb = [
 requires-dist = [
     { name = "bitsandbytes", marker = "extra == 'optim8bit'", specifier = ">=0.45.3" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "matplotlib", marker = "extra == 'docs'", specifier = ">=3.9" },
     { name = "music21", marker = "extra == 'abc-music'", specifier = ">=9.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11" },

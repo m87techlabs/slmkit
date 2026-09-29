@@ -44,13 +44,13 @@ def _parse(output: str) -> Tune | None:
     return clean_tune("X:1\n" + output, "generated")
 
 
-@lru_cache(maxsize=4096)
-def _abc2midi_ok(output: str) -> bool:
+def abc2midi(abc: str) -> tuple[bytes | None, list[str]]:
+    """Play a complete ABC file (with `X:`) through abc2midi: (MIDI bytes or None, errors)."""
     if shutil.which("abc2midi") is None:
-        raise RuntimeError("the plays grader needs abc2midi (scripts/setup-ml-distro.sh)")
+        raise RuntimeError("abc2midi is not installed (scripts/setup-ml-distro.sh)")
     with tempfile.TemporaryDirectory() as tmp:
         src, out = Path(tmp) / "t.abc", Path(tmp) / "t.mid"
-        src.write_text("X:1\n" + output)
+        src.write_text(abc)
         # errors="replace": abc2midi quotes the input in its messages and can cut a multi-byte
         # character in half; a broken sample must not crash the grader.
         proc = subprocess.run(
@@ -61,7 +61,13 @@ def _abc2midi_ok(output: str) -> bool:
             check=False,
         )
         errors = [ln for ln in proc.stdout.splitlines() if ln.startswith("Error")]
-        return out.is_file() and not errors
+        return (out.read_bytes() if out.is_file() else None), errors
+
+
+@lru_cache(maxsize=4096)
+def _abc2midi_ok(output: str) -> bool:
+    midi, errors = abc2midi("X:1\n" + output)
+    return midi is not None and not errors
 
 
 def plays(prompt: EvalPrompt, output: str) -> dict[str, float]:

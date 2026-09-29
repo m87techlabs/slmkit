@@ -46,3 +46,21 @@ def test_rejects_malformed_vocab() -> None:
         CharTokenizer(["a", "a"])
     with pytest.raises(ValueError):
         CharTokenizer(["ab"])
+
+
+def test_hugging_face_twin_gives_the_same_ids(tmp_path: Path) -> None:
+    """The exported tokenizer.json (a WordLevel model split per character) must encode exactly
+    like the char tokenizer, including <unk> for unseen characters and newlines."""
+    tok = CharTokenizer.train([TEXT])
+    hf = tok.to_hf()
+    text = TEXT + "zé\n\n  !"
+    assert hf.encode(text).ids == tok.encode(text)
+    assert UNK_ID in tok.encode(text)
+    hf.save(str(tmp_path / "tokenizer.json"))
+    back = load_tokenizer(tmp_path)  # detected as WordLevel, rebuilt as a CharTokenizer
+    assert isinstance(back, CharTokenizer) and back.chars == tok.chars
+
+
+def test_rebuilding_from_a_vocabulary_without_specials_fails() -> None:
+    with pytest.raises(ValueError, match="special tokens"):
+        CharTokenizer.from_hf_vocab({"a": 0, "b": 1})

@@ -121,3 +121,13 @@ def test_graders_rate_the_human_corpus_highly() -> None:
     assert statistics.fmean(acc) > 0.97
     tonic = [abcn.final_pitch_class(t) == abcn.tonic_pitch_class(t.key) for t in tunes]
     assert 0.7 < statistics.fmean(tonic) < 0.9
+
+
+@pytest.mark.skipif(shutil.which("abc2midi") is None, reason="needs abc2midi")
+def test_render_sample_writes_abc_and_midi() -> None:
+    """`slm export --to-windows` files: an .abc any ABC app opens, plus MIDI to listen to."""
+    project = load_project("abc_music", {}, Path("/tmp"))
+    files = project.render_sample(JIG_PROMPT, GOOD_JIG)
+    abc = files[".abc"].decode()
+    assert abc.startswith("X:1\nT:jig-G (generated)\n") and abc.endswith(GOOD_JIG)
+    assert files[".mid"][:4] == b"MThd"  # the MIDI file signature

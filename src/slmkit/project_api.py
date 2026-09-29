@@ -128,3 +128,10 @@ class Project(ABC):
 
     def logits_processor(self) -> LogitsProcessor | None:
         return None
+
+    def render_sample(self, prompt: EvalPrompt, text: str) -> dict[str, bytes]:
+        """Files that show one generated sample to a person, keyed by file extension, for
+        `slm export --to-windows` (ADR 0007). `text` is the prompt plus the model's output.
+        Default: the text itself. A project can add a rendering a person can use directly,
+        e.g. MIDI for music or a PGN for chess."""
+        return {".txt": text.encode()}

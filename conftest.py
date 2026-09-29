@@ -95,3 +95,20 @@ def toy_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, slm_home: Path) ->
     (repo / "projects" / "toy" / "experiments" / "base.yaml").write_text(TOY_EXPERIMENT)
     monkeypatch.setenv("SLM_REPO", str(repo))
     return repo
+
+
+@pytest.fixture
+def toy_run(toy_repo: Path) -> str:
+    """A briefly trained `toy/base` run (CPU, a few seconds). Returns its run ID."""
+    from slmkit.config import load_experiment
+    from slmkit.train.trainer import Trainer
+
+    exp = load_experiment(
+        "toy/base",
+        ["run.tracker=none", "train.compile=false", "train.max_tokens=640",
+         "train.warmup_tokens=64", "train.eval_every_steps=10", "train.eval_iters=2",
+         "train.eval_samples=1", "train.sample_tokens=4"],
+    )  # fmt: skip
+    trainer = Trainer(exp, device="cpu", log=lambda _: None)
+    trainer.run()
+    return trainer.run_id

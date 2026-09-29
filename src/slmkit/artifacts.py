@@ -179,6 +179,10 @@ def read_manifest(path: Path) -> dict[str, Any]:
 def find_artifact(artifact: str) -> Path:
     """Locate an artifact directory by ID anywhere under $SLM_HOME."""
     home = slm_home()
+    # Exported models are addressed by name and version, not by hash (see export/hf.py).
+    name, sep, version = artifact.rpartition(":")
+    if sep and (home / "models" / name / version / MANIFEST).is_file():
+        return home / "models" / name / version
     for manifest in home.rglob(MANIFEST):
         if manifest.parent.name == artifact:
             return manifest.parent

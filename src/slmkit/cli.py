@@ -24,6 +24,8 @@ app = typer.Typer(
 )
 runs_app = typer.Typer(help="Inspect training runs.")
 app.add_typer(runs_app, name="runs")
+models_app = typer.Typer(help="Inspect exported models.")
+app.add_typer(models_app, name="models")
 
 EXPERIMENT = typer.Argument(..., help="<project>/<experiment>, e.g. shakespeare_char/ref")
 SET = typer.Option(None, "--set", help="Override a config value: --set train.lr=6e-4 (repeatable)")
@@ -108,7 +110,9 @@ def pack(experiment: str = EXPERIMENT, set_: list[str] | None = SET) -> None:
 @app.command()
 @_friendly_errors
 def lineage(
-    artifact: str = typer.Argument(..., help="An artifact ID, e.g. pk-3f9a1c2b4d5e"),
+    artifact: str = typer.Argument(
+        ..., help="An artifact ID (pk-3f9a1c2b4d5e) or an exported model (abc-folk:1)"
+    ),
 ) -> None:
     """Trace an artifact back to its raw data through the manifests."""
     try:
@@ -133,6 +137,8 @@ def lineage(
                 value = ", ".join(names[:3]) + (
                     f", ... ({len(names)} total)" if len(names) > 3 else ""
                 )
+            elif isinstance(value, str) and "\n" in value:
+                value = repr(value)  # e.g. a model's example prompt: keep it on one line
             typer.echo(f"{pad}    {key} = {value}")
 
 
@@ -488,3 +494,95 @@ def runs_compare(
     width = max(18, *(len(v) for c in cols for v in c.values()))
     for row in rows:
         typer.echo(f"{row:<16}" + "".join(f"  {c.get(row, '-'):>{width}}" for c in cols))
+
+
+# ---------------------------------------------------------------------------- export & serve
+
+
+@app.command()
+@_friendly_errors
+def export(
+    run_id: str = typer.Argument(..., help="A run ID (or unique prefix) from `slm runs list`."),
+    name: str = typer.Option(..., help="Model name, e.g. abc-folk."),
+    version: int = typer.Option(..., help="Model version: 1, 2, ... Versions are immutable."),
+    which: str = typer.Option("best", help="best (lowest val loss) or latest checkpoint."),
+    to_windows: bool = typer.Option(
+        False, "--to-windows", help="Also write generated samples where Windows can open them."
+    ),
+    windows_dir: str = typer.Option(
+        "/mnt/c/Users/Public/Music/slmkit", help="Where --to-windows writes (a folder per model)."
+    ),
+    samples: int = typer.Option(2, help="--to-windows: samples per prompt."),
+    device: str = DEVICE,
+) -> None:
+    """Write a run's checkpoint as a Hugging Face-format model under $SLM_HOME/models/."""
+    from pathlib import Path
+
+    from slmkit.export.hf import export_run, load_export
+    from slmkit.registry import load_project
+    from slmkit.train.trainer import pick_device
+
+    try:
+        export_run(run_id, name, version, which=which, log=typer.echo)
+    except FileExistsError as exc:
+        typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from None
+    if not to_windows:
+        return
+    from slmkit.export.windows import to_windows as write_windows
+
+    dev = pick_device(device)
+    exported = load_export(f"{name}:{version}", dev)
+    proj = exported.manifest["config"]["project"]
+    project = load_project(proj["name"], proj["args"], artifacts.slm_home())
+    typer.echo(f"sampling {samples} per prompt on {dev} ...")
+    dest = write_windows(exported, project, Path(windows_dir), per_prompt=samples, device=dev,
+                         log=typer.echo)  # fmt: skip
+    typer.echo(f"wrote {dest}")
+    if dest.as_posix().startswith("/mnt/"):
+        drive, rest = dest.parts[2], dest.parts[3:]
+        typer.echo("on Windows: " + drive.upper() + ":\\" + "\\".join(rest))
+
+
+@models_app.command("list")
+def models_list() -> None:
+    """Every exported model: source run, stage, size and parity result."""
+    from slmkit.export.hf import list_exports
+
+    rows = list_exports()
+    if not rows:
+        typer.echo("no exported models yet under $SLM_HOME/models")
+        return
+    typer.echo(f"{'MODEL':<20} {'STAGE':<9} {'PARAMS':>9} {'RUN':<17} {'STEP':>6} "
+               f"{'HF PARITY':>10}  CREATED")  # fmt: skip
+    for m in rows:
+        s = m["stats"]
+        hf = s.get("parity", {}).get("hf_max_abs_diff")
+        typer.echo(
+            f"{m['id']:<20} {s['stage']:<9} {s['params']:>9,} {m['inputs']['run']:<17} "
+            f"{s['step']:>6} {'-' if hf is None else f'{hf:.1e}':>10}  {m['created']}"
+        )
+
+
+@app.command()
+@_friendly_errors
+def serve(
+    model: str = typer.Option(..., "--model", help="An exported model, <name>:<version>."),
+    host: str = typer.Option("127.0.0.1", help="Bind address. Keep it local; see DESIGN 6.9."),
+    port: int = typer.Option(8000, help="TCP port."),
+    device: str = typer.Option("cpu", help="cpu (default: these models are tiny), cuda, auto."),
+) -> None:
+    """Serve an exported model over HTTP: /health, /info, POST /generate."""
+    import uvicorn
+
+    from slmkit.export.hf import load_export
+    from slmkit.serve.app import create_app
+    from slmkit.train.trainer import pick_device
+
+    dev = pick_device(device)
+    exported = load_export(model, dev)
+    s = exported.manifest["stats"]
+    typer.echo(f"{exported.ref}: {s['params']:,} params, {s['stage']}, from "
+               f"{exported.manifest['inputs']['run']} step {s['step']} · device {dev}")  # fmt: skip
+    typer.echo(f"try: curl -s http://{host}:{port}/info")
+    uvicorn.run(create_app(exported, dev), host=host, port=port, log_level="info")

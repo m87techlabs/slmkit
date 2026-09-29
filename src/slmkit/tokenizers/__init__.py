@@ -14,8 +14,11 @@ def load_tokenizer(directory: Path) -> Tokenizer:
     data = json.loads((directory / TOKENIZER_FILE).read_text())
     if data.get("type") == "char":
         return CharTokenizer.load(directory)
-    if data.get("model", {}).get("type") == "BPE":  # Hugging Face's tokenizer.json format
+    model = data.get("model", {})
+    if model.get("type") == "BPE":  # Hugging Face's tokenizer.json format
         return BPETokenizer.load(directory)
+    if model.get("type") == "WordLevel":  # an exported char tokenizer (CharTokenizer.to_hf)
+        return CharTokenizer.from_hf_vocab(model["vocab"])
     raise NotImplementedError(f"unrecognised tokenizer in {directory}")
 
 

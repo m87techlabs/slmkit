@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from tokenizers import Tokenizer as HFTokenizer
+
 TOKENIZER_FILE = "tokenizer.json"
 
 # Special tokens always occupy the lowest IDs, in this order, for every tokenizer type, so
@@ -31,3 +33,8 @@ class Tokenizer(ABC):
 
     @abstractmethod
     def save(self, directory: Path) -> None: ...
+
+    @abstractmethod
+    def to_hf(self) -> HFTokenizer:
+        """The same tokenizer (same IDs for the same text) in Hugging Face's `tokenizer.json`
+        format, which is what `slm export` ships."""

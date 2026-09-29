@@ -16,6 +16,9 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
+from tokenizers import Regex, decoders, models, pre_tokenizers
+from tokenizers import Tokenizer as HFTokenizer
+
 from slmkit.tokenizers.base import SPECIALS, TOKENIZER_FILE, UNK_ID, Tokenizer
 
 
@@ -60,6 +63,25 @@ class CharTokenizer(Tokenizer):
     def save(self, directory: Path) -> None:
         payload = {"type": self.type, "specials": list(SPECIALS), "chars": self.chars}
         (directory / TOKENIZER_FILE).write_text(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    def to_hf(self) -> HFTokenizer:
+        """The same tokenizer in Hugging Face's format, for exports: a word-level model whose
+        "words" are single characters, split one character at a time. IDs are identical, so an
+        exported model gives the same logits whichever library tokenizes."""
+        vocab = {tok: i for i, tok in enumerate(self._itos)}
+        hf = HFTokenizer(models.WordLevel(vocab=vocab, unk_token=SPECIALS[0]))
+        hf.pre_tokenizer = pre_tokenizers.Split(Regex(r"[\s\S]"), behavior="isolated")
+        hf.decoder = decoders.Fuse()
+        hf.add_special_tokens(list(SPECIALS))
+        return hf
+
+    @classmethod
+    def from_hf_vocab(cls, vocab: dict[str, int]) -> CharTokenizer:
+        """Rebuild from an exported tokenizer.json vocabulary (the inverse of `to_hf`)."""
+        ordered = sorted(vocab, key=vocab.__getitem__)
+        if tuple(ordered[: len(SPECIALS)]) != SPECIALS:
+            raise ValueError("exported vocabulary does not start with the special tokens")
+        return cls(ordered[len(SPECIALS) :])
 
     @classmethod
     def load(cls, directory: Path) -> CharTokenizer:
