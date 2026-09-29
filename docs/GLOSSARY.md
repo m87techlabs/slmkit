@@ -32,6 +32,13 @@ instructions.
 (prompt, desired response). Teaches the base model to respond to an instruction rather than just
 continue text. Everything downstream of this — RLHF, DPO — is out of scope for slmkit.
 
+**Base model vs fine-tuned model.** A base model continues text; a fine-tuned (instruction-tuned) model
+follows requests. In slmkit the base model is the pretrained run, and the SFT run starts from its best
+checkpoint. See [`concepts/sft.md`](concepts/sft.md).
+
+**Loss mask.** Setting some targets to `-100` so they add nothing to the loss or the gradient. SFT masks
+the prompt, so the model learns only to answer.
+
 **Inference.** Running a trained model to produce output. Also called serving or generation.
 
 **The lifecycle.** slmkit's pipeline, and the thing this repo exists to teach:

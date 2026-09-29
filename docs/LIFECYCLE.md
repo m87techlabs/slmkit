@@ -71,7 +71,7 @@ Explainer: [`concepts/tokenization.md`](concepts/tokenization.md). Hands-on: run
 | Measure | full-split metrics: perplexity, bpc, accuracy | `scripts/val_metrics.py` | printed | ☑ M1 (stop-gap) |
 | Grade | project graders on generated outputs, ≥ 3 seeds | `slm eval` | `runs/…/eval/` | M2 |
 | Tune | change one thing per experiment YAML, compare | new YAML + `slm runs compare` | one run per config | ☑ by hand (M1 fitting study); `compare` in M2 |
-| Fine-tune (SFT) | teach an instruction → answer format, loss on the answer only | `slm sft` | `runs/…` (parent = pretrain run) | M2 |
+| Fine-tune (SFT) | teach an instruction → answer format, loss on the answer only | `slm sft` | `runs/…` (parent = pretrain run) | ☑ M2 |
 
 **What "tuning" means here.** Hyperparameters are the settings the training doesn't learn by itself:
 model size, learning rate, dropout, batch size, how long to train. Each experiment is one YAML file, so
@@ -229,7 +229,7 @@ and ends when its exit criteria are met ([`ROADMAP.md`](ROADMAP.md)).
 | Collect / split / tokenize / pack | | ☑ char | BPE, augmentation | fixed vocab, streaming, exclusions | | ball-event vocab |
 | Pretrain + evaluate | | ☑ | sweeps, ≥ 3 seeds | scaling study | | larger runs |
 | Graders | | by hand (novelty) | ☑ planned | legal moves, Elo | | calibration |
-| Fine-tune (SFT) | | | ☑ planned | | | |
+| Fine-tune (SFT) | | | ☑ | | | |
 | Export + serve | | parity proven | ☑ planned | legal-move masking | GGUF, container, gateway | |
 | Manage + monitor | | lineage, runs list | model card | | registry, backups | |
 

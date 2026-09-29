@@ -8,8 +8,8 @@ Built up phase by phase, like the M1 runbook.*
 |---|---|---|
 | **A** | The ABC corpus: clean, group, transpose, header dropout | ☑ |
 | **B** | BPE tokenizer, compared with char by bits per character | ☑ |
-| **C** | Graders, `slm eval`, `slm runs compare` | ☑ this page |
-| D | SFT: prompts from headers, loss on the answer only | ☐ |
+| **C** | Graders, `slm eval`, `slm runs compare` | ☑ |
+| **D** | SFT: prompts from headers, loss on the answer only | ☑ this page |
 | E | Export, serve, listen on Windows | ☐ |
 | F | Sweeps, exit criteria | ☐ |
 
@@ -528,3 +528,161 @@ slips, not garbage:
 - [x] `slm runs compare` shows config, training result and eval side by side.
 - [x] Both models beat the baseline on `plays` and `bar_accuracy`; the tonic weakness is explained.
 - [ ] **You** have run C.1–C.3 and the output matches.
+
+---
+
+# Phase D: SFT, from continuing text to following requests
+
+*Concepts: [`../concepts/sft.md`](../concepts/sft.md). Code:
+[`src/slmkit/data/sft.py`](../../src/slmkit/data/sft.py),
+[`src/slmkit/train/stage.py`](../../src/slmkit/train/stage.py). Decision:
+[ADR 0006](../decisions/0006-training-stages-and-sft-api.md).*
+
+## D.0 The checks
+
+```bash
+make test                                                                          # 164 passed
+uv run pytest -q tests/unit/test_sft.py projects/abc_music/tests/test_sft_requests.py   # 13 passed
+```
+
+The one DESIGN requires: `test_prompt_positions_get_zero_loss_and_zero_gradient`. The prompt's
+positions contribute exactly **zero** loss and **zero** gradient; the answer's don't. Also covered:
+SFT starts from the pretrained weights (compared tensor by tensor), resumes like pretraining, and
+every request template uses only characters the frozen vocabulary knows.
+
+---
+
+## D.1 What the model is trained on
+
+```bash
+uv run python -c "
+from pathlib import Path
+from slmkit.registry import load_project
+from slmkit.data.split import read_docs
+p = load_project('abc_music', {}, Path('/tmp'))
+for e in p.sft_eval_prompts('val'): print(repr(e.prompt))
+ex = list(p.sft_examples(read_docs(Path.home() / 'slm/datasets/abc_music/ds-f4f721a6c0e4/train.jsonl')))
+print(len(ex), 'examples'); print(ex[5].prompt + ex[5].completion[:120])"
+```
+```
+'% a reel in D major\n'
+'% a jig in G major\n'
+'% a hornpipe in A major\n'
+'% a tune in 3/4 time in E minor\n'
+11312 examples
+% compose a reel in the key of Bb major
+R:reel
+M:2/4
+L:1/16
+K:Bb
+vB2(Bd) fBdf | bdfb Td'2(c'b) | gbfb dfbg |\
+```
+
+The request is an ABC comment line (`%`), so request plus answer is still valid ABC. The answer
+always states every header. The phrasing varies across 8 templates, all lower-case, because the
+vocabulary has no capital `W` or `?` (concepts/sft.md §1).
+
+---
+
+## D.2 Fine-tune
+
+The experiment enables SFT in its `sft:` section:
+
+```yaml
+sft:
+  enabled: true
+  lr: 3.0e-4                # a third of pretraining's peak
+  epochs: 3
+```
+
+That section is **not** part of the pretrained run's identity, so turning SFT on doesn't start a new
+pretraining run.
+
+```bash
+uv run slm sft abc_music/baseline
+```
+
+About 27 seconds:
+
+```
+  sft: 407 train examples longer than block_size were skipped
+  sft: 8 val examples longer than block_size were skipped
+run run-9b890db6dced  (abc_music/baseline, abc-baseline-sft)
+  stage       sft, starting from run-749d028accd4 (ckpt/best); lr 0.0003, 3 epochs
+  per step    16,384 tokens = 32 x 512
+  budget      16,750,080 tokens = 1.40e+14 FLOPs
+eval  step      0  train 1.2269  val 1.2809  (gap +0.0540)  * best
+eval  step    250  train 1.1287  val 1.1863  (gap +0.0577)  * best
+eval  step    500  train 1.0810  val 1.1467  (gap +0.0657)  * best
+eval  step   1000  train 1.0401  val 1.1092  (gap +0.0691)  * best
+complete: 16,760,832 tokens, best val 1.1092, 0.01 GPU-h
+```
+
+- **It starts near 1.28, not 4.4:** it begins from the pretrained model, not random weights.
+- The loss is over **answers only**, and the answers' headers are predictable from the request, so it
+  isn't comparable with pretraining's 1.256.
+- No bpc: bits per character isn't defined for a masked loss.
+
+The sample printed at step 0 (before any fine-tuning) and at the end, for "a jig in G major":
+
+```
+step 0 (pretrained model)                  step 1023 (fine-tuned)
+% a jig in G major                         % a jig in G major
+M:6/8                                      R:jig
+L:1/8                                      M:6/8
+K:D            ← wrong key, no R:          L:1/8
+F EFG A2 B | cde d2 B AFC | …              K:G
+                                           D|DFD DFG | ABA ABA | G2 E GED | AFA ABA |
+                                           DED GEC | DBB ABd | cBA GEG | AFA A2 :|
+```
+
+`slm run abc_music/baseline` now does both stages: it skips pretraining (complete), then skips SFT
+(complete).
+
+---
+
+## D.3 Measure it: three ways of asking
+
+```bash
+uv run slm eval run-749d                   # base model, header prompts
+uv run slm eval run-749d --prompts sft     # base model, asked in words (no SFT)
+uv run slm eval run-9b89                   # SFT model, asked in words (auto for an SFT run)
+```
+
+| | Base + header prompt | Base + words | **SFT + words** |
+|---|---|---|---|
+| plays | 0.643 ± 0.025 | 0.413 ± 0.051 | **0.635** ± 0.059 |
+| bar_accuracy | 0.677 ± 0.011 | 0.268 ± 0.025 | **0.689** ± 0.011 |
+| ends_on_tonic | 0.188 ± 0.058 | 0.132 ± 0.010 | **0.292** ± 0.046 |
+| ended | 0.920 ± 0.005 | 0.830 ± 0.013 | **0.982** ± 0.010 |
+
+```bash
+uv run slm runs compare run-749d run-9b89
+```
+```
+run                               run-749d028a                  run-9b890db6
+name                              abc-baseline              abc-baseline-sft
+stage                                 pretrain                           sft
+…
+eval              ev-7925f26eaf (sft, 3 seeds)  ev-0a9ec0eef6 (sft, 3 seeds)
+plays                            0.413 ± 0.051                 0.635 ± 0.059
+bar_accuracy                     0.268 ± 0.025                 0.689 ± 0.011
+```
+
+(`compare` shows each run's latest report: for the base run, that's the words-prompt one.)
+
+**Reading it:**
+- **Base + words** collapses: without SFT, the model doesn't understand a request.
+- **SFT + words reaches parity** with base + headers on plays and bars. That is the M2 exit criterion
+  (DESIGN §5.1: parity is the pass mark, not a win). SFT's contribution is the interface.
+- It also **finishes** 98% of the time and ends on the tonic more often. SFT examples are always
+  complete tunes.
+
+---
+
+## Phase D: done when
+
+- [x] `make test` (164) and `make lint` pass; the mask test proves zero loss and gradient on prompts.
+- [x] `slm sft` fine-tunes from the pretrained best checkpoint, resumably; `slm run` chains both.
+- [x] SFT + plain-language requests reaches parity with base + headers on plays and bars.
+- [ ] **You** have run D.1–D.3 and the output matches.

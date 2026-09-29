@@ -85,14 +85,14 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 - [x] Tokenizers: `char` baseline; add `bpe.py` (HF `tokenizers`) and compare: 1.812 vs 1.824 bpc at equal compute, one seed each (tokenization.md §6); the 3-seed comparison is in the Phase F sweep.
 - [x] `graders/` (engine): n-gram novelty, parse-rate wrapper.
 - [x] Project graders: plays in `abc2midi`, bar durations vs the requested `M:`, ends on the requested tonic (prompt adherence via `EvalPrompt.meta`); calibrated on the human corpus (evaluation.md §3).
-- [ ] SFT: prompt templates, prompt-token loss masking, plus a unit test.
+- [x] SFT: prompt templates, prompt-token loss masking, plus a unit test (zero loss and zero gradient on prompt positions); `slm sft`, and `slm run` continuing into SFT (ADR 0006).
 - [x] `eval/` runner with multi-seed aggregation and a no-model baseline; `slm runs compare`.
 - [ ] `export/hf.py` plus the HF parity test; `MODEL_CARD.md` generation.
 - [ ] `serve/app.py` (FastAPI `/generate`).
 - [ ] `export --to-windows` for MIDI (abc2midi) so you can listen on Windows.
 - [ ] Sweep nano vs micro, char vs BPE, with and without augmentation (3 seeds each).
 - [ ] Write `docs/runbooks/m2-abc-music.md` (verify by hand: ingest, splits, graders, listen to output).
-- [ ] Write `docs/concepts/`: `sft.md` (why loss masking, how base and instruct models differ)
+- [x] Write `docs/concepts/`: `sft.md` (why loss masking, how base and instruct models differ)
       and `evaluation.md` (why programmatic graders, why ≥3 seeds, what a baseline is for).
 
 **Exit criteria**
