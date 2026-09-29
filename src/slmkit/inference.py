@@ -25,6 +25,7 @@ class LoadedRun:
     model: CausalLM
     state: dict[str, Any]  # the checkpoint's trainer state (step, val loss, ...)
     checkpoint: str  # "best" or "step_0000900"
+    stage: str = "pretrain"  # "sft" for a fine-tuned run
 
     @property
     def run_id(self) -> str:
@@ -59,4 +60,5 @@ def load_run(prefix: str, which: str = "best", device: torch.device | None = Non
     model = CausalLM(args).to(device).eval()
     model.load_state_dict(torch.load(ckpt_dir / "model.pt", map_location=device, weights_only=True))
     state = torch.load(ckpt_dir / "state.pt", map_location="cpu", weights_only=False)
-    return LoadedRun(run_dir, cfg, tokenizer, model, state, ckpt_dir.name)
+    stage = manifest.get("stats", {}).get("stage", "pretrain")
+    return LoadedRun(run_dir, cfg, tokenizer, model, state, ckpt_dir.name, stage)

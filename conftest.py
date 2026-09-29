@@ -24,7 +24,7 @@ TOY_PROJECT = textwrap.dedent(
     """
     from pydantic import BaseModel, ConfigDict
 
-    from slmkit.project_api import Doc, EvalPrompt, Project, TokenizerSpec
+    from slmkit.project_api import Doc, EvalPrompt, Project, SFTExample, TokenizerSpec
     from slmkit.registry import register_project
 
 
@@ -62,6 +62,14 @@ TOY_PROJECT = textwrap.dedent(
 
         def graders(self):
             return []
+
+        def sft_examples(self, docs):
+            # The "request" is the first three characters; the answer is the rest.
+            for d in docs:
+                yield SFTExample(prompt=d.text[:3], completion=d.text[3:])
+
+        def sft_eval_prompts(self, split):
+            yield EvalPrompt(id="p", prompt="abc")
     """
 )
 

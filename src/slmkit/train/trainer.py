@@ -30,23 +30,20 @@ from typing import Any
 import numpy as np
 import torch
 
-from slmkit import artifacts, pipeline
+from slmkit import artifacts
 from slmkit.config.load import Experiment
-from slmkit.data.pack import count_chars, open_packed
-from slmkit.data.sampler import RandomWindowSampler
-from slmkit.data.split import read_docs
 from slmkit.model import CausalLM, ModelArgs, count_parameters, flops_per_token
 from slmkit.model.stats import PLANNING_TFLOPS
-from slmkit.project_api import Project
 from slmkit.sampling import generate
-from slmkit.tokenizers import EOS_ID, Tokenizer, load_tokenizer
+from slmkit.tokenizers import EOS_ID, Tokenizer
 from slmkit.tracking import make_tracker
 from slmkit.train import checkpoint
 from slmkit.train.guards import NonFiniteGuard, TrainingDiverged
 from slmkit.train.optim import build_optimizer
-from slmkit.train.run import create_run_dir, run_id, write_status
+from slmkit.train.run import write_status
 from slmkit.train.schedule import lr_at
 from slmkit.train.seed import rng_state, seed_everything, set_rng_state
+from slmkit.train.stage import Sampler, Stage, pretrain_stage
 
 SPEC_PEAK_TFLOPS = 112.0  # used for MFU only when `slm doctor --bench` has not measured one
 THROUGHPUT_WARMUP_STEPS = 10  # excluded from throughput: compilation and allocator warm-up
@@ -77,30 +74,28 @@ def _fmt_hours(hours: float) -> str:
 
 class Trainer:
     def __init__(
-        self, exp: Experiment, *, device: str = "auto", log: Callable[[str], None] = print
+        self,
+        exp: Experiment,
+        *,
+        stage: Stage | None = None,
+        device: str = "auto",
+        log: Callable[[str], None] = print,
     ) -> None:
         self.exp = exp
         self.cfg = cfg = exp.config
         self.device = pick_device(device)
         self._print = log
 
-        packed = pipeline.ensure_packed(exp)
-        tok = pipeline.ensure_tokenizer(exp)
-        self.tokenizer: Tokenizer = load_tokenizer(tok.path)
-        self.run_id = run_id(exp, packed.id, tok.id)
-        self.run_dir = create_run_dir(exp, self.run_id, packed.id, tok.id)
+        self.stage = stage or pretrain_stage(exp)
+        self.tcfg = tcfg = self.stage.train  # this stage's effective training settings
+        self.tokenizer: Tokenizer = self.stage.tokenizer
+        self.run_id = self.stage.run_id
+        self.run_dir = self.stage.run_dir
         self._log_file = (self.run_dir / "train.log").open("a", encoding="utf-8")
-
-        self.train_data = open_packed(packed.path / "train.bin")
-        self.val_data = open_packed(packed.path / "val.bin")
-        # Characters per validation token: turns per-token loss into bits per character, the
-        # one number comparable across tokenizers.
-        val_docs = read_docs(pipeline.ensure_dataset(exp).path / "val.jsonl")
-        self.val_chars_per_token = count_chars(val_docs, append_eos=cfg.data.append_eos) / max(
-            1, len(self.val_data)
+        self.args = ModelArgs.from_config(
+            cfg.model, self.tokenizer.vocab_size, self.stage.block_size
         )
-        self.args = ModelArgs.from_config(cfg.model, self.tokenizer.vocab_size, cfg.data.block_size)
-        self.tokens_per_step = cfg.train.batch_size * cfg.data.block_size * cfg.train.grad_accum
+        self.tokens_per_step = tcfg.batch_size * self.stage.block_size * tcfg.grad_accum
 
         resume = checkpoint.latest(self.run_dir)
         if resume is None:
@@ -109,11 +104,14 @@ class Trainer:
         torch.backends.cudnn.allow_tf32 = True
 
         self.model = CausalLM(self.args).to(self.device)
-        self.optimizer = build_optimizer(self.model, cfg.train, self.device)
-        self.sampler = RandomWindowSampler(
-            self.train_data, cfg.data.block_size, cfg.train.batch_size, seed=cfg.run.seed
-        )
-        self.guard = NonFiniteGuard(cfg.train.max_consecutive_skips)
+        if resume is None and self.stage.init_weights is not None:
+            # SFT: start from the pretrained weights. The optimizer starts fresh: its running
+            # averages describe the pretraining gradients, not this new task's.
+            state = torch.load(self.stage.init_weights, map_location=self.device, weights_only=True)
+            self.model.load_state_dict(state)
+        self.optimizer = build_optimizer(self.model, tcfg, self.device)
+        self.sampler = self.stage.make_sampler("train", cfg.run.seed)
+        self.guard = NonFiniteGuard(tcfg.max_consecutive_skips)
         self.step = 0
         self.tokens_seen = 0
         self.gpu_seconds = 0.0
@@ -129,11 +127,10 @@ class Trainer:
         # Compile the forward pass on the GPU. Sampling uses the plain model, because its
         # growing sequence lengths would make the compiled version recompile repeatedly.
         self.forward: Callable[..., Any] = self.model
-        if cfg.train.compile and self.device.type == "cuda":
-            self.forward = torch.compile(self.model, mode=cfg.train.compile_mode)
+        if tcfg.compile and self.device.type == "cuda":
+            self.forward = torch.compile(self.model, mode=tcfg.compile_mode)
 
         self.tracker = make_tracker(cfg.run.tracker, self.run_dir, self.step if resume else None)
-        self.project: Project = pipeline.project_for(exp)
         self._stop_reason: str | None = None
         self._first_signal_at = 0.0
 
@@ -157,18 +154,19 @@ class Trainer:
         path.write_text("".join(ln + "\n" for ln in keep))
 
     def _status(self, *, complete: bool = False, note: str = "") -> None:
-        remaining = self.cfg.train.max_tokens - self.tokens_seen
+        remaining = self.tcfg.max_tokens - self.tokens_seen
         write_status(
             self.run_dir,
             {
                 "run_id": self.run_id,
-                "name": self.cfg.run.name,
+                "name": self.stage.name,
                 "experiment": self.exp.address,
+                "stage": self.stage.kind,
                 "complete": complete,
                 "note": note,
                 "step": self.step,
                 "tokens_seen": self.tokens_seen,
-                "max_tokens": self.cfg.train.max_tokens,
+                "max_tokens": self.tcfg.max_tokens,
                 "gpu_seconds": round(self.gpu_seconds, 1),
                 "tok_per_s": self.measured_tok_s,
                 "gpu_hours_remaining": (
@@ -205,7 +203,7 @@ class Trainer:
             self.model.state_dict(),
             self.optimizer.state_dict(),
             self._state(),
-            keep_last_n=self.cfg.train.keep_last_n_ckpts,
+            keep_last_n=self.tcfg.keep_last_n_ckpts,
         )
         self._last_ckpt_info = {"step": self.step, "tokens": self.tokens_seen, "path": path.name,
                                 "time": _dt.datetime.now().astimezone().isoformat(timespec="seconds")}  # fmt: skip
@@ -239,7 +237,7 @@ class Trainer:
             self.device.type, dtype=torch.bfloat16, enabled=self.device.type == "cuda"
         )
 
-    def _batch(self, sampler: RandomWindowSampler) -> tuple[torch.Tensor, torch.Tensor]:
+    def _batch(self, sampler: Sampler) -> tuple[torch.Tensor, torch.Tensor]:
         x, y = sampler.next_batch()
         return (
             torch.from_numpy(x).to(self.device, non_blocking=True),
@@ -247,14 +245,12 @@ class Trainer:
         )
 
     @torch.no_grad()
-    def estimate_loss(self, data: np.ndarray) -> float:
-        """Mean loss over `eval_iters` batches, drawn from a fixed seed each time."""
-        sampler = RandomWindowSampler(
-            data, self.cfg.data.block_size, self.cfg.train.batch_size, seed=EVAL_SEED
-        )
+    def estimate_loss(self, split: str) -> float:
+        """Mean loss over `eval_iters` batches of `split`, drawn from a fixed seed each time."""
+        sampler = self.stage.make_sampler(split, EVAL_SEED)
         self.model.eval()
         losses = []
-        for _ in range(self.cfg.train.eval_iters):
+        for _ in range(self.tcfg.eval_iters):
             x, y = self._batch(sampler)
             with self._autocast():
                 _, loss = self.forward(x, y)
@@ -265,14 +261,14 @@ class Trainer:
 
     def samples(self) -> list[tuple[str, str]]:
         cfg = self.cfg
-        prompts = list(self.project.eval_prompts("val"))[: cfg.train.eval_samples]
+        prompts = self.stage.eval_prompts[: self.tcfg.eval_samples]
         gen = torch.Generator(device=self.device).manual_seed(EVAL_SEED)
         out = []
         for p in prompts:
             idx = torch.tensor([self.tokenizer.encode(p.prompt)], device=self.device)
             with self._autocast():
                 ids = generate(
-                    self.model, idx, cfg.train.sample_tokens,
+                    self.model, idx, self.tcfg.sample_tokens,
                     temperature=cfg.eval.temperature, top_k=cfg.eval.top_k, top_p=cfg.eval.top_p,
                     stop_token=EOS_ID, generator=gen,
                 )  # fmt: skip
@@ -281,18 +277,20 @@ class Trainer:
 
     def evaluate(self) -> None:
         t0 = time.perf_counter()
-        val = self.estimate_loss(self.val_data)
-        train = self.estimate_loss(self.train_data)
+        val = self.estimate_loss("val")
+        train = self.estimate_loss("train")
         self.last_val = val
         improved = val < self.best_val
-        bpc = val / self.val_chars_per_token / math.log(2)
+        cpt = self.stage.val_chars_per_token
+        bpc = val / cpt / math.log(2) if cpt else None
         self.log(
             f"eval  step {self.step:>6}  train {train:.4f}  val {val:.4f}  "
-            f"(gap {val - train:+.4f}, {bpc:.3f} bpc){'  * best' if improved else ''}  "
-            f"[{time.perf_counter() - t0:.1f}s]"
+            f"(gap {val - train:+.4f}{f', {bpc:.3f} bpc' if bpc else ''})"
+            f"{'  * best' if improved else ''}  [{time.perf_counter() - t0:.1f}s]"
         )
         self.tracker.scalar("loss/val", val, self.step)
-        self.tracker.scalar("bpc/val", bpc, self.step)
+        if bpc:
+            self.tracker.scalar("bpc/val", bpc, self.step)
         self.tracker.scalar("loss/train_eval", train, self.step)
         samples = self.samples()
         for name, text in samples:
@@ -312,7 +310,7 @@ class Trainer:
 
     def train_step(self) -> tuple[float, float, float]:
         """One optimizer step. Returns (loss, grad norm before clipping, lr)."""
-        cfg = self.cfg.train
+        cfg = self.tcfg
         lr = lr_at(self.tokens_seen + self.tokens_per_step, lr=cfg.lr, warmup_tokens=cfg.warmup_tokens,
                    max_tokens=cfg.max_tokens, min_lr_ratio=cfg.min_lr_ratio)  # fmt: skip
         for group in self.optimizer.param_groups:
@@ -343,21 +341,24 @@ class Trainer:
     def _banner(self) -> None:
         c = count_parameters(self.model)
         fpt = flops_per_token(self.model)
-        remaining = self.cfg.train.max_tokens - self.tokens_seen
+        remaining = self.tcfg.max_tokens - self.tokens_seen
         est = remaining * fpt / (PLANNING_TFLOPS * 1e12) / 3600
-        self.log(f"run {self.run_id}  ({self.exp.address}, {self.cfg.run.name})")
+        self.log(f"run {self.run_id}  ({self.exp.address}, {self.stage.name})")
+        if self.stage.kind != "pretrain":
+            self.log(f"  stage       {self.stage.kind}, starting from {self.stage.parent} "
+                     f"(ckpt/best); lr {self.tcfg.lr:g}, {self.tcfg.epochs} epochs")  # fmt: skip
         self.log(f"  dir         {self.run_dir}")
         self.log(f"  device      {self.device}  bf16={self.device.type == 'cuda'}  "
                  f"compile={self.forward is not self.model}")  # fmt: skip
         self.log(f"  parameters  {c.total:,} ({c.non_embedding:,} non-embedding + "
                  f"{c.embedding:,} embedding)")  # fmt: skip
-        self.log(f"  per step    {self.tokens_per_step:,} tokens = {self.cfg.train.batch_size} x "
-                 f"{self.cfg.data.block_size}" + (f" x {self.cfg.train.grad_accum} accum"
-                 if self.cfg.train.grad_accum > 1 else ""))  # fmt: skip
-        self.log(f"  budget      {self.cfg.train.max_tokens:,} tokens "
-                 f"= {self.cfg.train.max_tokens * fpt:.2e} FLOPs")  # fmt: skip
+        self.log(f"  per step    {self.tokens_per_step:,} tokens = {self.tcfg.batch_size} x "
+                 f"{self.stage.block_size}" + (f" x {self.tcfg.grad_accum} accum"
+                 if self.tcfg.grad_accum > 1 else ""))  # fmt: skip
+        self.log(f"  budget      {self.tcfg.max_tokens:,} tokens "
+                 f"= {self.tcfg.max_tokens * fpt:.2e} FLOPs")  # fmt: skip
         if self.resumed_from is not None:
-            done = self.tokens_seen / self.cfg.train.max_tokens
+            done = self.tokens_seen / self.tcfg.max_tokens
             self.log(f"  RESUMING    from {self.resumed_from.path.name} ({done:.1%} done, "
                      f"saved {self._saved_at}, {self.gpu_seconds / 3600:.2f} GPU-h so far)")  # fmt: skip
         rem = remaining / self.measured_tok_s / 3600 if self.measured_tok_s else est
@@ -378,7 +379,7 @@ class Trainer:
 
     def run(self, *, max_steps: int | None = None, max_minutes: float | None = None) -> str:
         """Train until done or stopped. Returns "complete" or "stopped"."""
-        cfg = self.cfg.train
+        cfg = self.tcfg
         self._banner()
         if self.tokens_seen >= cfg.max_tokens:
             self.log("run already complete; nothing to do")
@@ -483,7 +484,7 @@ class Trainer:
         fpt = flops_per_token(self.model)
         peak, source = _peak_tflops()
         mfu = tok_s * fpt / (peak * 1e12)
-        remaining = (self.cfg.train.max_tokens - self.tokens_seen) / tok_s / 3600
+        remaining = (self.tcfg.max_tokens - self.tokens_seen) / tok_s / 3600
         mem = (
             f"{torch.cuda.max_memory_allocated() / 1024**3:.2f} GiB peak"
             if self.device.type == "cuda"

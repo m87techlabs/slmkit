@@ -25,6 +25,7 @@ import yaml
 
 from slmkit import artifacts
 from slmkit.config.load import Experiment, dump_resolved
+from slmkit.config.schema import TrainConfig
 
 RUNS_DIR = "runs"
 RUN_CODE_VERSION = 1
@@ -71,22 +72,35 @@ def runs_root() -> Path:
     return artifacts.slm_home() / RUNS_DIR
 
 
-def create_run_dir(exp: Experiment, rid: str, packed_id: str, tokenizer_id: str) -> Path:
-    """Create the run directory on first use. Idempotent: an existing run is left alone."""
+def create_run_dir(
+    exp: Experiment,
+    rid: str,
+    inputs: dict[str, str],
+    *,
+    stage: str = "pretrain",
+    train: TrainConfig | None = None,
+) -> Path:
+    """Create the run directory on first use. Idempotent: an existing run is left alone.
+
+    `inputs` are the artifacts the run reads: packed data and tokenizer for pretraining, the
+    parent run for SFT. `train` overrides the experiment's `train:` section in the saved config
+    when a stage uses different settings (SFT), so config.resolved.yaml is what actually ran.
+    """
     run_dir = runs_root() / rid
     if (run_dir / artifacts.MANIFEST).is_file():
         return run_dir
     run_dir.mkdir(parents=True, exist_ok=True)
+    config = exp.config if train is None else exp.config.model_copy(update={"train": train})
     manifest = artifacts.build_manifest(
         kind="run",
         artifact=rid,
         project=exp.project,
         code_version=RUN_CODE_VERSION,
-        config=exp.config.model_dump(mode="json"),
-        inputs={"packed": packed_id, "tokenizer": tokenizer_id},
-        stats={"experiment": exp.address, "name": exp.config.run.name},
+        config=config.model_dump(mode="json"),
+        inputs=inputs,
+        stats={"experiment": exp.address, "name": exp.config.run.name, "stage": stage},
     )
-    (run_dir / "config.resolved.yaml").write_text(dump_resolved(exp.config))
+    (run_dir / "config.resolved.yaml").write_text(dump_resolved(config))
     (run_dir / artifacts.MANIFEST).write_text(json.dumps(manifest, indent=2) + "\n")
     return run_dir
 

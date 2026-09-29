@@ -136,14 +136,26 @@ def evaluate(
     device: torch.device,
     *,
     baseline: bool = True,
+    prompts_kind: str = "auto",
     log: Callable[[str], None] = print,
 ) -> tuple[dict[str, Any], Path]:
+    """`prompts_kind`: "headers" (the project's eval_prompts), "sft" (plain-language requests),
+    or "auto" (sft for a fine-tuned run, headers otherwise). Asking a *base* model in words
+    shows what SFT added."""
     cfg = run.config
     manifest = artifacts.read_manifest(run.run_dir)
+    while "packed" not in manifest["inputs"]:  # an SFT run: its data is its parent's
+        manifest = artifacts.read_manifest(run.run_dir.parent / manifest["inputs"]["parent"])
     packed = artifacts.find_artifact(manifest["inputs"]["packed"])
     dataset = artifacts.find_artifact(artifacts.read_manifest(packed)["inputs"]["dataset"])
     project = load_project(cfg["project"]["name"], cfg["project"]["args"], artifacts.slm_home())
-    prompts = list(project.eval_prompts("val"))
+    # A fine-tuned run is asked in words; a base run is given header prompts. Both carry the
+    # same `meta`, so the same graders score whether each did what was asked.
+    kind = prompts_kind if prompts_kind != "auto" else ("sft" if run.stage == "sft" else "headers")
+    sft_prompts = project.sft_eval_prompts("val") if kind == "sft" else None
+    if kind == "sft" and sft_prompts is None:
+        raise ValueError(f"project {cfg['project']['name']!r} has no SFT prompts")
+    prompts = list(sft_prompts if sft_prompts is not None else project.eval_prompts("val"))
     graders = [
         *project.graders(),
         ngram_novelty(d.text for d in read_docs(dataset / "train.jsonl")),
@@ -159,6 +171,7 @@ def evaluate(
                 "checkpoint": run.checkpoint,
                 "step": run.state["step"],
                 "baseline": baseline,
+                "prompts": kind,
                 "graders": [inspect.getsource(g) for g in graders],
             }
         )[:10]
@@ -192,6 +205,8 @@ def evaluate(
         "eval_id": eval_id,
         "run_id": run.run_id,
         "name": cfg["run"]["name"],
+        "stage": run.stage,
+        "prompts_kind": kind,
         "checkpoint": {
             "which": run.checkpoint,
             "step": run.state["step"],

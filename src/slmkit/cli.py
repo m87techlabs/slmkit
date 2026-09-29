@@ -228,19 +228,25 @@ def model(
 
 
 def _train(experiment: str, set_: list[str] | None, device: str, max_minutes: float | None,
-           max_steps: int | None) -> None:  # fmt: skip
+           max_steps: int | None, stages: tuple[str, ...] = ("pretrain",)) -> None:  # fmt: skip
+    """Run the given stages in order; a stage that stops early ends the session there."""
     from slmkit.train.guards import TrainingDiverged
+    from slmkit.train.stage import sft_stage
     from slmkit.train.trainer import Trainer
 
     exp = load_experiment(experiment, set_)
     typer.echo(f"{exp.address}:")
     pipeline.ensure_packed(exp, typer.echo)
-    trainer = Trainer(exp, device=device)
-    try:
-        trainer.run(max_minutes=max_minutes, max_steps=max_steps)
-    except TrainingDiverged as exc:
-        typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=3) from None
+    for kind in stages:
+        stage = sft_stage(exp) if kind == "sft" else None
+        trainer = Trainer(exp, stage=stage, device=device)
+        try:
+            outcome = trainer.run(max_minutes=max_minutes, max_steps=max_steps)
+        except TrainingDiverged as exc:
+            typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=3) from None
+        if outcome != "complete":
+            return
 
 
 DEVICE = typer.Option("auto", help="cuda, cpu, or auto (cuda when available).")
@@ -275,8 +281,29 @@ def run(
     max_minutes: float | None = MAX_MINUTES,
     max_steps: int | None = MAX_STEPS,
 ) -> None:
-    """The whole pipeline: build missing data artifacts, then pretrain (resuming if possible)."""
-    _train(experiment, set_, device, max_minutes, max_steps)
+    """The whole pipeline: build missing data artifacts, pretrain, then SFT if `sft.enabled`.
+
+    Every stage resumes if it has a checkpoint and is skipped if already complete.
+    """
+    exp = load_experiment(experiment, set_)
+    stages = ("pretrain", "sft") if exp.config.sft.enabled else ("pretrain",)
+    _train(experiment, set_, device, max_minutes, max_steps, stages)
+
+
+@app.command()
+@_friendly_errors
+def sft(
+    experiment: str = EXPERIMENT,
+    set_: list[str] | None = SET,
+    device: str = DEVICE,
+    max_minutes: float | None = MAX_MINUTES,
+    max_steps: int | None = MAX_STEPS,
+) -> None:
+    """Fine-tune the experiment's pretrained model on request -> answer pairs (resumable).
+
+    Starts from the pretrained run's best checkpoint; the loss counts only the answers.
+    """
+    _train(experiment, set_, device, max_minutes, max_steps, ("sft",))
 
 
 def _ago(iso: str | None) -> str:
@@ -370,6 +397,9 @@ def eval_(
     samples: int | None = typer.Option(None, help="Samples per seed. Default: eval.num_samples."),
     which: str = typer.Option("best", help="best (lowest val loss) or latest checkpoint."),
     baseline: bool = typer.Option(True, help="Also score the no-model frequency baseline."),
+    prompts: str = typer.Option(
+        "auto", help="headers, sft (plain-language requests), or auto (sft for fine-tuned runs)."
+    ),
     device: str = DEVICE,
 ) -> None:
     """Generate samples and grade them: every project grader plus novelty, mean ± spread."""
@@ -391,7 +421,9 @@ def eval_(
     )
     typer.echo(f"{run.run_id} ({run.config['run']['name']}) · {run.checkpoint} · step "
                f"{run.state['step']} · {len(settings.seeds)} seeds × {settings.num_samples} samples")  # fmt: skip
-    report, path = evaluate(run, settings, dev, baseline=baseline, log=typer.echo)
+    report, path = evaluate(
+        run, settings, dev, baseline=baseline, prompts_kind=prompts, log=typer.echo
+    )
     has_base = "baseline" in report
     typer.echo(
         f"\n{'metric':<16} {'model':>17}"
@@ -431,24 +463,27 @@ def runs_compare(
         best = min(evals, key=lambda r: r["val_loss"]) if evals else {}
         col = {
             "run": run_dir.name[:12],
-            "name": cfg["run"]["name"],
+            "name": st.get("name", cfg["run"]["name"]),
+            "stage": st.get("stage", "pretrain"),
             "model": cfg["model"]["preset"],
             "tokenizer": tok["type"] + (f" {tok['vocab_size']}" if tok.get("vocab_size") else ""),
             "seed": str(cfg["run"]["seed"]),
             "tokens": _short(st.get("tokens_seen", 0)),
             "GPU-h": f"{st.get('gpu_seconds', 0) / 3600:.2f}",
             "best val loss": f"{best['val_loss']:.4f}" if best else "-",
-            "best val bpc": f"{best['val_bpc']:.3f}" if "val_bpc" in best else "-",
+            # bpc is absent for runs trained before it existed, and None for SFT (masked loss).
+            "best val bpc": f"{best['val_bpc']:.3f}" if best.get("val_bpc") is not None else "-",
         }
         report = latest_report(run_dir)
         if report:
-            col["eval"] = f"{report['eval_id']} ({len(report['settings']['seeds'])} seeds)"
+            kind = report.get("prompts_kind", "headers")
+            col["eval"] = f"{report['eval_id']} ({kind}, {len(report['settings']['seeds'])} seeds)"
             for m, stat in report["model"]["aggregate"].items():
                 col[m] = fmt(stat)
                 if m not in metrics:
                     metrics.append(m)
         cols.append(col)
-    rows = ["run", "name", "model", "tokenizer", "seed", "tokens", "GPU-h", "best val loss",
+    rows = ["run", "name", "stage", "model", "tokenizer", "seed", "tokens", "GPU-h", "best val loss",
             "best val bpc", "eval", *metrics]  # fmt: skip
     width = max(18, *(len(v) for c in cols for v in c.values()))
     for row in rows:

@@ -38,6 +38,8 @@ class Doc:
 
 @dataclass(frozen=True)
 class SFTExample:
+    """One supervised example: a request and the answer the model should give to it."""
+
     prompt: str
     completion: str
     meta: dict[str, Any] = field(default_factory=dict)
@@ -107,6 +109,14 @@ class Project(ABC):
     def tokenizer_spec(self) -> TokenizerSpec: ...
 
     def sft_examples(self, docs: Iterable[Doc]) -> Iterator[SFTExample] | None:
+        """Instruction/answer pairs built from documents (one split at a time), or None if the
+        project has no SFT stage. The loss is computed on `completion` only."""
+        return None
+
+    def sft_eval_prompts(self, split: str) -> Iterator[EvalPrompt] | None:
+        """Requests in the same form as `sft_examples` prompts, for sampling and grading a
+        fine-tuned model. `meta` should say what was asked (as in `eval_prompts`), so the same
+        graders measure whether the model did it. None if the project has no SFT stage."""
         return None
 
     @abstractmethod
