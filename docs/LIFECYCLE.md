@@ -69,8 +69,8 @@ Explainer: [`concepts/tokenization.md`](concepts/tokenization.md). Hands-on: run
 | Pretrain | self-supervised next-token training | `slm pretrain` / `slm run` | `runs/run-…/` (checkpoints, metrics, log) | ☑ M1 |
 | Evaluate | validation loss every N steps, samples, best checkpoint | built into the trainer | `metrics.jsonl`, `ckpt/best/` | ☑ M1 |
 | Measure | full-split metrics: perplexity, bpc, accuracy | `scripts/val_metrics.py` | printed | ☑ M1 (stop-gap) |
-| Grade | project graders on generated outputs, ≥ 3 seeds | `slm eval` | `runs/…/eval/` | M2 |
-| Tune | change one thing per experiment YAML, compare | new YAML + `slm runs compare` | one run per config | ☑ by hand (M1 fitting study); `compare` in M2 |
+| Grade | project graders on generated outputs, ≥ 3 seeds | `slm eval` | `runs/…/eval/` | ☑ M2 |
+| Tune | change one thing per experiment YAML, repeat with 3 training seeds, compare | new YAML + `slm run --set run.seed=…` + `slm runs summary` | one run per config and seed | ☑ M2 (experiments.md) |
 | Fine-tune (SFT) | teach an instruction → answer format, loss on the answer only | `slm sft` | `runs/…` (parent = pretrain run) | ☑ M2 |
 
 **What "tuning" means here.** Hyperparameters are the settings the training doesn't learn by itself:
