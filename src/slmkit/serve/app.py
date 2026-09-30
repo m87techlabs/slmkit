@@ -69,49 +69,40 @@ class GenerateResponse(BaseModel):
     tokens_per_second: float
 
 
-def create_app(exported: ExportedModel, device: torch.device, ui: Path | None = None) -> FastAPI:
-    """`ui` overrides the export's own `ui/` directory, for developing a viewer without
-    re-exporting (`slm serve --ui projects/<name>/web`)."""
-    model = exported.model.to(device).eval()
-    tok = exported.tokenizer
-    defaults = exported.generation
-    stats = exported.manifest["stats"]
-    lock = threading.Lock()
-    app = FastAPI(
-        title=f"slmkit · {exported.ref}",
-        description=f"Generation API for {exported.ref}. See MODEL_CARD.md in {exported.path}.",
-    )
+class ModelServer:
+    """One exported model, ready to answer: what `slm serve` wraps in an app, and what
+    `slm studio` keeps one of per model it serves."""
 
-    ui = ui or exported.path / "ui"
-    if (ui / "viewer.js").is_file():
-        app.mount("/ui", StaticFiles(directory=ui), name="ui")
+    def __init__(self, exported: ExportedModel, device: torch.device, ui: Path | None = None):
+        self.exported = exported
+        self.device = device
+        self.model = exported.model.to(device).eval()
+        self.ui = ui or exported.path / "ui"
+        self._lock = threading.Lock()
 
-    @app.get("/", response_class=HTMLResponse)
-    def page() -> str:
-        return PAGE.read_text()
+    @property
+    def viewer_dir(self) -> Path | None:
+        return self.ui if (self.ui / "viewer.js").is_file() else None
 
-    @app.get("/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok", "model": exported.ref}
-
-    @app.get("/info")
-    def info() -> dict[str, Any]:
+    def info(self) -> dict[str, Any]:
+        stats = self.exported.manifest["stats"]
         return {
-            "model": exported.ref,
-            "project": exported.manifest["project"],
+            "model": self.exported.ref,
+            "project": self.exported.manifest["project"],
             "stage": stats["stage"],
             "params": stats["params"],
             "vocab_size": stats["vocab_size"],
             "context_tokens": stats["block_size"],
             "example_prompt": stats["example_prompt"],
-            "defaults": defaults,
-            "device": str(device),
-            "source_run": exported.manifest["inputs"]["run"],
-            "viewer": "/ui/viewer.js" if (ui / "viewer.js").is_file() else None,
+            "defaults": self.exported.generation,
+            "device": str(self.device),
+            "source_run": self.exported.manifest["inputs"]["run"],
+            # Relative to the page, so the same page works at / and under a prefix (slm studio).
+            "viewer": "ui/viewer.js" if self.viewer_dir else None,
         }
 
-    @app.post("/generate")
-    def generate_(req: GenerateRequest) -> GenerateResponse:
+    def generate(self, req: GenerateRequest) -> GenerateResponse:
+        defaults, tok, device = self.exported.generation, self.exported.tokenizer, self.device
         max_new = int(req.max_new_tokens or defaults["max_new_tokens"])
         temperature = float(defaults["temperature"] if req.temperature is None else req.temperature)
         top_k = int(defaults["top_k"] if req.top_k is None else req.top_k)
@@ -122,11 +113,11 @@ def create_app(exported: ExportedModel, device: torch.device, ui: Path | None = 
         ids = tok.encode(req.prompt)
         # An empty prompt starts a fresh document: in training, every document followed <eos>.
         context = ids or [EOS_ID]
-        with lock:
+        with self._lock:
             start = time.perf_counter()
             gen = torch.Generator(device=device).manual_seed(seed)
             out = generate(
-                model,
+                self.model,
                 torch.tensor([context], device=device),
                 max_new,
                 temperature=temperature,
@@ -140,7 +131,7 @@ def create_app(exported: ExportedModel, device: torch.device, ui: Path | None = 
         new = out[: out.index(EOS_ID)] if finished else out
         completion = tok.decode(new)
         return GenerateResponse(
-            model=exported.ref,
+            model=self.exported.ref,
             completion=completion,
             text=req.prompt + completion,
             finished=finished,
@@ -152,5 +143,33 @@ def create_app(exported: ExportedModel, device: torch.device, ui: Path | None = 
             seconds=round(seconds, 4),
             tokens_per_second=round(len(out) / seconds, 1) if seconds > 0 else 0.0,
         )
+
+
+def create_app(exported: ExportedModel, device: torch.device, ui: Path | None = None) -> FastAPI:
+    """`ui` overrides the export's own `ui/` directory, for developing a viewer without
+    re-exporting (`slm serve --ui projects/<name>/web`)."""
+    server = ModelServer(exported, device, ui)
+    app = FastAPI(
+        title=f"slmkit · {exported.ref}",
+        description=f"Generation API for {exported.ref}. See MODEL_CARD.md in {exported.path}.",
+    )
+    if server.viewer_dir:
+        app.mount("/ui", StaticFiles(directory=server.viewer_dir), name="ui")
+
+    @app.get("/", response_class=HTMLResponse)
+    def page() -> str:
+        return PAGE.read_text()
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "model": exported.ref}
+
+    @app.get("/info")
+    def info() -> dict[str, Any]:
+        return server.info()
+
+    @app.post("/generate")
+    def generate_(req: GenerateRequest) -> GenerateResponse:
+        return server.generate(req)
 
     return app

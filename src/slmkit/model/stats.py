@@ -7,7 +7,7 @@ from typing import cast
 
 from torch import nn
 
-from slmkit.model.llama import Block, CausalLM
+from slmkit.model.llama import Block, CausalLM, ModelArgs
 
 # AdamW in mixed precision: fp32 weights (4) + fp32 gradients (4) + two fp32 moments (4 + 4).
 TRAIN_BYTES_PER_PARAM = 16
@@ -48,6 +48,16 @@ def count_parameters(model: CausalLM) -> ParamCount:
         mlp_per_layer=_numel(layer.mlp),
         norms_per_layer=_numel(layer.input_layernorm) + _numel(layer.post_attention_layernorm),
     )
+
+
+def parameters_from_args(args: ModelArgs) -> int:
+    """The same total as `count_parameters`, from the architecture alone (no model built):
+    what the studio shows for any run or preset without loading weights."""
+    d, hd, kv = args.d_model, args.head_dim, args.n_kv_heads
+    attention = 2 * d * (args.n_heads * hd) + 2 * d * (kv * hd)  # q and o; k and v
+    per_layer = attention + 3 * d * args.ffn_hidden + 2 * d  # SwiGLU's 3 matrices; 2 norms
+    head = 0 if args.tie_embeddings else args.vocab_size * d
+    return args.vocab_size * d + args.n_layers * per_layer + d + head
 
 
 def flops_per_token(model: CausalLM, seq_len: int | None = None) -> int:

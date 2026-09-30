@@ -26,6 +26,10 @@ runs_app = typer.Typer(help="Inspect training runs.")
 app.add_typer(runs_app, name="runs")
 models_app = typer.Typer(help="Inspect exported models.")
 app.add_typer(models_app, name="models")
+studio_app = typer.Typer(
+    help='slm studio, "See it in action": everything built so far, in a browser.'
+)
+app.add_typer(studio_app, name="studio")
 
 EXPERIMENT = typer.Argument(..., help="<project>/<experiment>, e.g. shakespeare_char/ref")
 SET = typer.Option(None, "--set", help="Override a config value: --set train.lr=6e-4 (repeatable)")
@@ -662,3 +666,62 @@ def runs_summary(
     width = max(18, *(len(v) for c in cols for v in c.values()))
     for row in rows:
         typer.echo(f"{row:<14}" + "".join(f"  {c.get(row, '-'):>{width}}" for c in cols))
+
+
+# ---------------------------------------------------------------------------- studio
+
+STUDIO_PORT = typer.Option(8765, help="Local port for the studio.")
+
+
+@studio_app.command("start")
+@_friendly_errors
+def studio_start(
+    port: int = STUDIO_PORT,
+    open_: bool = typer.Option(True, "--open/--no-open", help="Open it in your browser."),
+) -> None:
+    """Start the studio in the background and open it in the browser."""
+    from slmkit.studio import process
+
+    try:
+        process.start(port, open_=open_, log=typer.echo)
+    except RuntimeError as exc:
+        typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from None
+
+
+@studio_app.command("stop")
+def studio_stop() -> None:
+    """Stop the background studio."""
+    from slmkit.studio import process
+
+    process.stop(log=typer.echo)
+
+
+@studio_app.command("status")
+def studio_status() -> None:
+    """Is the studio running, and does it answer? Exit code 0 if healthy, 1 if not."""
+    from slmkit.studio import process
+
+    st = process.status()
+    if st is None:
+        typer.echo("slm studio is not running  (start it: uv run slm studio start)")
+        raise typer.Exit(code=1)
+    healthy = st["health"] is not None
+    typer.echo(f"slm studio is running: {st['url']}  pid {st['pid']}, since {st['started']}, "
+               f"health {'ok' if healthy else 'NOT ANSWERING'}")  # fmt: skip
+    typer.echo(f"  log: {process.state_dir() / 'studio.log'}")
+    if not healthy:
+        raise typer.Exit(code=1)
+
+
+@studio_app.command("run")
+def studio_run(port: int = STUDIO_PORT) -> None:
+    """Run the studio in the foreground (Ctrl-C stops it), e.g. inside tmux."""
+    import uvicorn
+
+    from slmkit.studio import process
+    from slmkit.studio.app import create_app
+
+    process.ensure_vendor(typer.echo)
+    typer.echo(f"slm studio: http://localhost:{port}/  (Ctrl-C to stop)")
+    uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning")

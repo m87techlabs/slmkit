@@ -74,6 +74,6 @@ def test_a_viewer_directory_is_served_under_ui(toy_run: str, tmp_path: Path) -> 
     (ui / "viewer.js").write_text("export function render() {}\n")
     app = create_app(load_export("toy-model:1"), torch.device("cpu"), ui)
     c = TestClient(app)
-    assert c.get("/info").json()["viewer"] == "/ui/viewer.js"
+    assert c.get("/info").json()["viewer"] == "ui/viewer.js"
     js = c.get("/ui/viewer.js")
     assert js.status_code == 200 and "javascript" in js.headers["content-type"]

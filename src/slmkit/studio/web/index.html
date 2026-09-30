@@ -1,0 +1,30 @@
+<!doctype html>
+<!--
+  slm studio, "See it in action". A shell (header, project switcher, navigation) and one page at a
+  time, each an ES module in pages/. No build step and no framework: studio.js lists the pages;
+  adding one is adding a module and a line there (ADR 0009).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>slm studio · See it in action</title>
+<link rel="stylesheet" href="/vendor/uPlot.min.css">
+<link rel="stylesheet" href="/static/studio.css">
+<script src="/vendor/uPlot.iife.min.js" onerror="window.uPlotMissing = true"></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/home"><strong>slm studio</strong> <span>See it in action</span></a>
+  <nav id="nav" aria-label="Pages"></nav>
+  <label class="switcher">Project
+    <select id="project" aria-label="Project"></select>
+  </label>
+</header>
+<main id="page" tabindex="-1"><p class="muted">Loading…</p></main>
+<footer class="foot">
+  Read-only views of <code id="home-path">$SLM_HOME</code>: every number comes from a file on disk.
+</footer>
+<script type="module" src="/static/studio.js"></script>
+</body>
+</html>

@@ -3,7 +3,8 @@
   slm serve's playground: one page, no build step, no dependencies. It talks to the same
   /info and /generate endpoints as curl does.
 
-  A model can bring its own viewer: if /info names one (ui/viewer.js inside the export, ADR 0008),
+  All URLs are relative to the page, so it works at / (slm serve) and under /play/<name>/<version>/
+  (slm studio). A model can bring its own viewer: if info names one (ui/viewer.js in the export, ADR 0008),
   this page imports it as an ES module and calls, if present:
 
     setup({ info, container, setPrompt })   add controls that build a prompt; setPrompt(text) fills the box
@@ -126,7 +127,7 @@ function text(tag, content, cls) {
 }
 
 async function start() {
-  info = await (await fetch("/info")).json();
+  info = await (await fetch("info")).json();
   $("title").textContent = info.model;
   $("meta").textContent = `${info.project} · ${info.stage === "sft" ? "fine-tuned (SFT)" : "pretrained base"}` +
     ` · ${info.params.toLocaleString()} parameters · ${info.context_tokens}-token context · ${info.device}`;
@@ -146,7 +147,7 @@ async function start() {
   showTemperature();
   if (info.viewer) {
     try {
-      viewer = await import(info.viewer);
+      viewer = await import(new URL(info.viewer, location.href).href);
       if (viewer.setup) await viewer.setup({ info, container: $("builder"), setPrompt: (p) => { $("prompt").value = p; } });
     } catch (err) {
       $("builder").append(text("p", `The model's viewer failed to load: ${err}`, "error"));
@@ -168,7 +169,7 @@ async function generate() {
   $("go").disabled = true;
   $("result").replaceChildren(text("p", "Generating…", "empty"));
   try {
-    const response = await fetch("/generate", { method: "POST",
+    const response = await fetch("generate", { method: "POST",
       headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const data = await response.json();
     if (!response.ok) {
@@ -208,7 +209,7 @@ async function show(index) {
     const q = new URLSearchParams({ prompt: result.text.slice(0, result.text.length - result.completion.length),
       seed: result.seed, temperature: result.settings.temperature,
       max_new_tokens: result.settings.max_new_tokens, go: 1 });
-    navigator.clipboard?.writeText(`${location.origin}/?${q}`);
+    navigator.clipboard?.writeText(`${location.origin}${location.pathname}?${q}`);
     link.textContent = "Link copied";
   });
   stats.append(reuse, link);
