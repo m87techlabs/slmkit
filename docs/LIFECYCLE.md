@@ -210,8 +210,8 @@ presets and file formats are [`MODEL.md`](MODEL.md).
 flowchart LR
     M0["<b>M0 · Environment</b><br/>WSL · CUDA · doctor<br/>121.6 TFLOPS measured"]:::done
     M1["<b>M1 · Engine</b><br/>data · model · trainer<br/>Shakespeare val 1.29"]:::done
-    M2["<b>M2 · ABC music</b><br/>BPE · graders · SFT<br/>export · serve · listen"]:::next
-    M3["<b>M3 · Chess</b><br/>fixed vocab · legal moves<br/>scaling sweep"]:::future
+    M2["<b>M2 · ABC music</b><br/>BPE · graders · SFT<br/>export · serve · sweeps"]:::done
+    M3["<b>M3 · Chess</b><br/>fixed vocab · legal moves<br/>scaling sweep"]:::next
     M4["<b>M4 · Serving + MLOps</b><br/>GGUF · container · gateway<br/>registry · backups"]:::future
     M5["<b>M5 · Cricket</b><br/>calibrated forecasts<br/>larger runs"]:::future
     M0 --> M1 --> M2 --> M3 --> M4 --> M5

@@ -75,7 +75,7 @@ Goal: prove the trainer is correct against a published result before trusting an
 
 ---
 
-## M2 — First real project: ABC music (full lifecycle) ◐
+## M2 — First real project: ABC music (full lifecycle) ☑
 
 Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export, serve.
 *~6–10 sessions, tens of GPU-hours across all sweeps.*
@@ -97,9 +97,14 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 - [x] Write `docs/concepts/`: `sft.md` (why loss masking, how base and instruct models differ)
       and `evaluation.md` (why programmatic graders, why ≥3 seeds, what a baseline is for).
 
-**Exit criteria**
-- [ ] The best model beats a trivial baseline on every grader; parse rate ≥ 95%. *(So far: every
-      grader beats the baseline, but the best `plays` is 0.730, from the SFT model. Phase F.)*
+**Exit criteria — met, except the parse rate, which is carried to M3 (decided 2026-09-30)**
+- [ ] The best model beats a trivial baseline on every grader; parse rate ≥ 95%. **Baseline: met**
+      (every grader, e.g. plays 0.743 vs 0.063). **Parse rate: not met.** The only meaningful
+      definition is the strict `plays` (no `abc2midi` error at all): 0.743 ± 0.050 for the best
+      configuration (`micro_noaug`). A lenient "it parses" is passed by random characters 91.5% of the
+      time, so it measures nothing, and lowering the temperature to reach 95% makes tunes loop and
+      copy instead (experiments.md §8). Carried to M3 as an `abc_music` target for constrained
+      decoding.
 - [x] The n-gram novelty grader shows it isn't regurgitating training tunes (0.998: 0.2% of
       32-character windows appear in training).
 - [x] SFT with a natural-language prompt reaches **at least parity** with the base model given a
@@ -124,6 +129,8 @@ Goal: stress the abstractions with a very different project, then refactor the e
 - [ ] `split_exclusions()`: game IDs referenced by the Lichess puzzle DB.
 - [ ] Project graders: legal-move rate, puzzle accuracy, Elo vs Stockfish (fixed skill/depth).
 - [ ] `logits_processor` for legal-move-masked decoding (serve and eval, both togglable).
+- [ ] Carried from M2: apply the same mechanism to `abc_music` (grammar-constrained decoding) and
+      reach `plays` ≥ 95% at the eval temperature without losing `ended` or novelty.
 - [ ] **Refactor:** anything chess needed that the Project API lacked gets generalized into the
       engine. Write an ADR for each change.
 - [ ] Scaling sweep: nano → micro → tiny (→ small if the GPU-hours are there), LR swept per size.

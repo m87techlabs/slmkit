@@ -1197,3 +1197,19 @@ T=0.2  plays 0.945  bar_accuracy 0.846  ended 0.860  novelty 0.957
 Random characters "parse" 91.5% of the time, because `abc2midi` recovers from almost anything; only
 the strict `plays` means something. Lowering the temperature raises `plays` towards 95% by making tunes
 loop and copy instead (experiments.md §8).
+
+---
+
+## Phase F: done when
+
+- [x] `make test` (191) and `make lint` pass.
+- [x] Five experiments × three training seeds, each evaluated; `slm runs summary` averages them.
+- [x] Every new experiment is a YAML file only (the framework check).
+- [x] Surprising results checked before being believed: leakage (F.5), and what "parse rate"
+      measures (F.6).
+- [ ] **You** have run F.1–F.6 and the output matches.
+
+## M2: closed
+
+Every exit criterion is met except `plays` ≥ 95%, which stands at 0.743 for the best configuration
+and is carried to M3 as a target for constrained decoding (ROADMAP, decided 2026-09-30).
