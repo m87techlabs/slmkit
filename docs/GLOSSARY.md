@@ -529,6 +529,10 @@ in every current browser. The playground loads a model's `viewer.js` this way.
 **SRI — Subresource Integrity.** A hash in a `<script>` or `<link>` tag. The browser downloads the file,
 hashes it, and refuses to use it if the hash differs, so a CDN can't serve changed code.
 
+**Transitive reduction.** A graph with every edge removed that a longer path already implies. The
+studio's Lifecycle page draws one, so it shows tokenizer → packed → run without a separate tokenizer →
+run line.
+
 **Oversubscription.** More busy threads than CPU cores: they take turns and all slow down. In `slm
 serve` it made generation 6× slower until the thread count was capped (serving.md §6).
 

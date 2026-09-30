@@ -23,4 +23,11 @@ must match exactly and which are only ballpark figures.
 |---|---|---|
 | [`m0-environment.md`](m0-environment.md) | M0 | ☑ |
 | [`m1-engine.md`](m1-engine.md) | M1 | ☑ |
-| [`m2-abc-music.md`](m2-abc-music.md) | M2 | ◐ Phase D |
+| [`m2-abc-music.md`](m2-abc-music.md) | M2 | ☑ |
+| [`studio.md`](studio.md) | Studio | ◐ Phase 1 |
+
+**In `slm studio`.** The studio lists each project's runbooks next to its runs. A runbook that belongs
+to one project says so near its top with `<!-- slm-studio: projects=abc_music -->` (a comma-separated
+list); a runbook without the marker is about the engine and shows for every project. Each project
+runbook ends with a "See it in slm studio" section: where that project's work shows up in the
+studio.

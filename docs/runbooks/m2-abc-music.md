@@ -1,4 +1,5 @@
 # Runbook M2: ABC music, the full lifecycle
+<!-- slm-studio: projects=abc_music -->
 
 *Companion to [`../concepts/data-preparation.md`](../concepts/data-preparation.md) (Phase A), and
 later pages per phase. Project details: [`projects/abc_music/README.md`](../../projects/abc_music/README.md).
@@ -1267,3 +1268,17 @@ loop and copy instead (experiments.md §8).
 
 Every exit criterion is met except `plays` ≥ 95%, which stands at 0.743 for the best configuration
 and is carried to M3 as a target for constrained decoding (ROADMAP, decided 2026-09-30).
+
+---
+
+# See it in slm studio
+
+`slm studio` shows everything this runbook built, read straight from `$SLM_HOME`
+([`studio.md`](studio.md) for starting it). With **abc_music** selected in the project switcher:
+
+| Page | What of M2 you'll see |
+|---|---|
+| **Your model** | 18 runs, 500M tokens read, 0.13 GPU-hours; the best model (`micro_noaug`, 1.331 bits per character); this runbook in the list |
+| **Lifecycle** | Phase A's raw tune books and the two datasets (with and without transposition), the char and BPE tokenizers (Phase B), every sweep run (Phase F), the SFT runs (Phase D) and the exports (Phase E). Click `abc-folk:1` to trace it back to the tune books |
+| **Training** | The Phase F sweep as curves: tick `baseline`, `micro`, `noaug` and `micro_noaug` and compare bits per character; open a `micro` run to see training and validation loss part at about step 500 (F.4) |
+| **Playground** | `abc-folk:1` with the request builder, sheet music and playback (E.6) |

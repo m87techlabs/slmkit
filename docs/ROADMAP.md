@@ -120,6 +120,34 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 
 ---
 
+## Studio — `slm studio`: "See it in action" ◐
+
+Goal: everything built and learnt so far, in one local, interactive web app, before M3 adds a
+second project. It reads only what is on disk ($SLM_HOME and the repo), so it can't drift from what
+the pipeline did. One studio for all projects, with a project switcher: M3's chess must appear with no
+studio change. Decided 2026-09-30: no Node (plain ES modules, served by the existing FastAPI);
+third-party browser libraries are downloaded to `$SLM_HOME/studio/vendor/` and verified by hash; run
+buttons execute read-only commands from a fixed list only. *~3–4 sessions, no GPU.*
+
+- [x] **Phase 1:** `slm studio start | stop | status | run`; pages **Your model** (what you built,
+      the machine, live GPU/CPU stats), **Lifecycle** (the pipeline as your real artifacts, with
+      lineage), **Training** (loss curves, samples at every eval, configs), **Playground** (any
+      exported model). ADR 0009, `runbooks/studio.md`, a "See it in slm studio" section per project runbook.
+- [ ] **Phase 2:** **Learn** (concepts, ADRs and runbooks rendered, diagrams, glossary on hover),
+      **Experiments** (sweeps, seeds, spreads), **Parameters** (size → params, FLOPs, GPU-hours).
+- [ ] **Phase 3:** **Verify**: each runbook check with a Run button (read-only commands) and your output
+      next to the expected output.
+
+**Exit criteria**
+- [ ] Starting, stopping and checking the studio each take one command, and nothing it writes lands
+      in the repo.
+- [ ] Every number on every page comes from a file on disk, and a test proves it for each API.
+- [ ] A project added in M3 appears in the switcher, with its runs, artifacts, models and runbook,
+      without changing studio code. *(Rehearsed with `shakespeare_char`, which the studio was never
+      written for: every page works.)*
+
+---
+
 ## M3 — Second project: chess (API hardening + scaling lab) ☐
 
 Goal: stress the abstractions with a very different project, then refactor the engine.
@@ -131,6 +159,7 @@ Goal: stress the abstractions with a very different project, then refactor the e
 - [ ] `split_exclusions()`: game IDs referenced by the Lichess puzzle DB.
 - [ ] Project graders: legal-move rate, puzzle accuracy, Elo vs Stockfish (fixed skill/depth).
 - [ ] `logits_processor` for legal-move-masked decoding (serve and eval, both togglable).
+- [ ] The chess runbook carries a "See it in slm studio" section, and chess shows up in the studio.
 - [ ] Carried from M2: apply the same mechanism to `abc_music` (grammar-constrained decoding) and
       reach `plays` ≥ 95% at the eval temperature without losing `ended` or novelty.
 - [ ] **Refactor:** anything chess needed that the Project API lacked gets generalized into the

@@ -568,6 +568,15 @@ one allowed exception is `export --to-windows`.
 - Optional MLOps exercise: deploy the serve container to Kubernetes with a readiness probe and
   run `slm eval` as a Job against it. Kubernetes is **not** used for training.
 
+### 6.9b Studio
+
+`slm studio` (ADR 0009) is a local web app, bound to 127.0.0.1, over what is on disk. Its read-only
+APIs cover `$SLM_HOME` (artifacts, runs, metrics, eval reports, models) and the repo (roadmap,
+runbooks), and its pages are plain ES modules. It reuses `slm serve`'s `ModelServer` for its
+playground. Its working set (process record, log, hash-checked browser libraries) lives in
+`$SLM_HOME/studio/`. It is project-agnostic: projects, grader columns and runbooks are discovered,
+never named.
+
 ### 6.10 Tracking
 
 A tracker interface with three implementations: `tensorboard` (default, local files under the

@@ -62,12 +62,14 @@ uv sync
 make doctor          # environment checks; must pass before any training command
 make test            # CPU unit tests, under 60s
 uv run slm run shakespeare_char/ref
+uv run slm studio start   # "See it in action": everything you built, in your browser
 ```
 
 ## Documentation
 
 | | |
 |---|---|
+| `slm studio` | **See it in action.** A local web app over your runs, artifacts, models and machine ([runbook](docs/runbooks/studio.md)) |
 | [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) | **Start here.** The model development lifecycle, with diagrams of the pipeline, architecture and roadmap |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every abbreviation and term, in plain language |
 | [`docs/MODEL.md`](docs/MODEL.md) | The model: type, architecture features, hyperparameters, size presets, file formats |

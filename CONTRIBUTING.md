@@ -132,6 +132,7 @@ uv run slm runs list                          # tokens done/target, GPU-hours, l
 uv run slm runs compare <run_a> <run_b>
 uv run slm export <run_id> --name <model> --version <n>
 uv run slm serve --model <model>:<n>
+uv run slm studio start | stop | status | run  # "See it in action": the local web studio
 uv run slm lineage <artifact_id>
 ```
 

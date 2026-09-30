@@ -95,6 +95,7 @@ Explainers: [`concepts/the-model.md`](concepts/the-model.md),
 | Listen / look | generated samples rendered by the project (MIDI for music) where Windows can open them | `slm export --to-windows` | ☑ M2 |
 | Package | container image, gateway in front (auth, TLS, rate limits), optional Kubernetes | Dockerfile, Compose | M4 |
 | Quantize | GGUF for llama.cpp-style runtimes | documented conversion | M4 |
+| See it | everything above, in a browser: artifacts and lineage, curves and samples, models to try, the machine | `slm studio` | ☑ Studio phase 1 |
 | Manage | model registry, lineage from model back to raw data, run history, off-box backups | `slm lineage`, `slm runs list`, `slm models list` | lineage + runs ☑ M1; versioned models ☑ M2; backup M4 |
 | Monitor | serving latency, error rates, drift in what users ask | — | M4 (light; single-user) |
 

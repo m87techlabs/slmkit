@@ -365,6 +365,27 @@ Triton Inference Server, which are built for fleets of GPU models, not one 3.5 M
 process, with no port opened, the way `curl` would. It is only needed for tests, so it lives in
 the `dev` extra.
 
+### uPlot
+**●** (slm studio, since the Studio milestone) · `1.6.32` · MIT · [docs](https://github.com/leeoniya/uPlot)
+
+**What it is.** A small, fast JavaScript library for time-series line charts (about 50 KB).
+
+**Why.** The studio's Training page draws loss curves, the learning-rate schedule and run comparisons,
+with a hover crosshair, legend and zoom. Nothing is committed: `slm studio start` downloads the pinned
+file into `$SLM_HOME/studio/vendor/` once and checks its SHA-384 hash (ADR 0009). Rejected: Chart.js
+(four times the size for the same line charts), ECharts (far larger), and hand-drawn SVG charts (hover,
+zoom and axis ticks are exactly the parts worth not writing).
+
+### Google Chrome / Microsoft Edge (headless)
+**○** (checking pages) · [Chrome headless](https://developer.chrome.com/docs/chromium/headless)
+
+**What it is.** The Windows browsers, run without a window from WSL (`chrome.exe --headless=new
+--screenshot=…`) to render a page to an image.
+
+**Why.** No Node is installed in WSL, so there's no JavaScript test runner. A real browser rendering each
+studio and playground page is the check that the JavaScript works. The runbooks' screenshots were made
+this way (studio.md §S.6). Nothing is installed; both browsers ship with Windows.
+
 ### Docker and Kubernetes
 **◐ M4** (optional) · [Docker](https://docs.docker.com/) · [Kubernetes](https://kubernetes.io/docs/) ·
 [kind](https://kind.sigs.k8s.io/) · [k3s](https://docs.k3s.io/)
