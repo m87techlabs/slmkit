@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import torch
 from fastapi.testclient import TestClient
@@ -57,3 +59,21 @@ def test_empty_prompt_starts_a_new_document(client: TestClient) -> None:
 )  # fmt: skip
 def test_bad_requests_are_rejected(client: TestClient, body: dict[str, object]) -> None:
     assert client.post("/generate", json=body).status_code == 422
+
+
+def test_playground_page_is_served(client: TestClient) -> None:
+    page = client.get("/")
+    assert page.status_code == 200 and "slmkit playground" in page.text
+    assert client.get("/info").json()["viewer"] is None  # the toy project ships no viewer
+
+
+def test_a_viewer_directory_is_served_under_ui(toy_run: str, tmp_path: Path) -> None:
+    export_run(toy_run, "toy-model", 1, log=lambda _: None)
+    ui = tmp_path / "web"
+    ui.mkdir()
+    (ui / "viewer.js").write_text("export function render() {}\n")
+    app = create_app(load_export("toy-model:1"), torch.device("cpu"), ui)
+    c = TestClient(app)
+    assert c.get("/info").json()["viewer"] == "/ui/viewer.js"
+    js = c.get("/ui/viewer.js")
+    assert js.status_code == 200 and "javascript" in js.headers["content-type"]

@@ -1,5 +1,7 @@
 """`slm serve`: an exported model behind a small HTTP API.
 
+    GET  /           a playground page: write a prompt, generate, see (and hear) the result
+    GET  /ui/…       the project's viewer, shipped inside the export (ADR 0008), if it has one
     GET  /health     liveness: {"status": "ok", "model": "abc-folk:1"}
     GET  /info       what the model is, how to prompt it, the default sampling settings
     POST /generate   {"prompt": "...", "max_new_tokens"?, "temperature"?, "top_k"?, "top_p"?,
@@ -13,6 +15,11 @@ Deliberately small. One model per process, one request at a time (a lock around 
 the models are tiny, and a queue in front of one CPU core buys nothing), no auth, no TLS, bound
 to 127.0.0.1 by default. For anything reachable by others, put an existing gateway in front of
 it (DESIGN §6.9).
+
+The page is generic: a prompt, sampling settings, the raw output and its statistics. What a
+result *looks like* is the project's business, so an export may carry a `ui/viewer.js` (copied
+from the project by `slm export`) that the page loads to draw the output: sheet music and a
+player for ABC. The server only hands those files out; it never runs project code.
 """
 
 from __future__ import annotations
@@ -20,16 +27,20 @@ from __future__ import annotations
 import secrets
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 import torch
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from slmkit.export.hf import ExportedModel
 from slmkit.sampling import generate
 from slmkit.tokenizers import EOS_ID, UNK_ID
 
+PAGE = Path(__file__).parent / "static" / "index.html"
 MAX_NEW_TOKENS = 4096  # a hard ceiling per request, so one call can't hold the server for long
 
 
@@ -58,7 +69,9 @@ class GenerateResponse(BaseModel):
     tokens_per_second: float
 
 
-def create_app(exported: ExportedModel, device: torch.device) -> FastAPI:
+def create_app(exported: ExportedModel, device: torch.device, ui: Path | None = None) -> FastAPI:
+    """`ui` overrides the export's own `ui/` directory, for developing a viewer without
+    re-exporting (`slm serve --ui projects/<name>/web`)."""
     model = exported.model.to(device).eval()
     tok = exported.tokenizer
     defaults = exported.generation
@@ -68,6 +81,14 @@ def create_app(exported: ExportedModel, device: torch.device) -> FastAPI:
         title=f"slmkit · {exported.ref}",
         description=f"Generation API for {exported.ref}. See MODEL_CARD.md in {exported.path}.",
     )
+
+    ui = ui or exported.path / "ui"
+    if (ui / "viewer.js").is_file():
+        app.mount("/ui", StaticFiles(directory=ui), name="ui")
+
+    @app.get("/", response_class=HTMLResponse)
+    def page() -> str:
+        return PAGE.read_text()
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -86,6 +107,7 @@ def create_app(exported: ExportedModel, device: torch.device) -> FastAPI:
             "defaults": defaults,
             "device": str(device),
             "source_run": exported.manifest["inputs"]["run"],
+            "viewer": "/ui/viewer.js" if (ui / "viewer.js").is_file() else None,
         }
 
     @app.post("/generate")

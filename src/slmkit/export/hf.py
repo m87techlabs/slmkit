@@ -23,6 +23,7 @@ a no-op, and a different checkpoint needs a new version number. Serving addresse
 from __future__ import annotations
 
 import json
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,7 +46,7 @@ from slmkit.tokenizers import EOS_ID, Tokenizer, load_tokenizer
 from slmkit.tokenizers.base import EOS, UNK
 from slmkit.train.run import read_status
 
-CODE_VERSION = 1  # bump when the files an export writes would change
+CODE_VERSION = 2  # bump when the files an export writes would change (2: the ui/ viewer)
 MODELS_DIR = "models"
 WEIGHTS = "model.safetensors"
 CARD = "MODEL_CARD.md"
@@ -359,6 +360,10 @@ def export_run(
         log(f"checking parity on {tmp.name} ...")
         stats["parity"] = check_parity(tmp, run, stats["example_prompt"])
         stats["weights_bytes"] = (tmp / WEIGHTS).stat().st_size
+        viewer = project.web_viewer()
+        if viewer is not None:  # the project's own display for `slm serve`'s page (ADR 0008)
+            shutil.copytree(viewer, tmp / "ui")
+            stats["viewer"] = sorted(p.name for p in (tmp / "ui").iterdir())
         (tmp / CARD).write_text(model_card(manifest))
     p = stats["parity"]
     log(

@@ -131,3 +131,12 @@ def test_render_sample_writes_abc_and_midi() -> None:
     abc = files[".abc"].decode()
     assert abc.startswith("X:1\nT:jig-G (generated)\n") and abc.endswith(GOOD_JIG)
     assert files[".mid"][:4] == b"MThd"  # the MIDI file signature
+
+
+def test_web_viewer_ships_a_viewer_module() -> None:
+    web = load_project("abc_music", {}, Path("/tmp")).web_viewer()
+    assert web is not None and (web / "viewer.js").is_file()
+    source = (web / "viewer.js").read_text()
+    # Pinned version plus subresource integrity for everything fetched from the CDN.
+    assert "abcjs@6.7.1" in source and source.count("sha384-") == 2
+    assert "export async function render" in source

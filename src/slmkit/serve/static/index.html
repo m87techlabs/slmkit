@@ -1,0 +1,255 @@
+<!doctype html>
+<!--
+  slm serve's playground: one page, no build step, no dependencies. It talks to the same
+  /info and /generate endpoints as curl does.
+
+  A model can bring its own viewer: if /info names one (ui/viewer.js inside the export, ADR 0008),
+  this page imports it as an ES module and calls, if present:
+
+    setup({ info, container, setPrompt })   add controls that build a prompt; setPrompt(text) fills the box
+    render({ info, result, container })     draw one /generate result (result is its JSON response)
+
+  Everything the model writes is inserted as text, never as HTML.
+
+  URL parameters prefill the form, so a result can be shared or reproduced as a link:
+    /?prompt=%25%20a%20jig%20in%20G%20major%2C%206%2F8%20time%0A&seed=3&temperature=0.8&go=1
+  (go=1 generates on load.)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>slmkit playground</title>
+<style>
+  :root {
+    --bg: #fcfcfb; --panel: #ffffff; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --line: #e1e0d9; --accent: #2a78d6; --accent-ink: #ffffff; --warn: #b4540f; --code: #f4f3ef;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --panel: #1c1c1a; --ink: #f0efea; --ink-2: #c3c2b7; --muted: #8e8d86;
+      --line: #33322e; --accent: #5b9ae6; --accent-ink: #0b0b0b; --warn: #f0a25c; --code: #232320;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--line); display: flex;
+           flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .meta { color: var(--ink-2); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 24px; padding: 24px;
+         max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+                  padding: 16px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+       margin: 0 0 10px; }
+  label { display: block; font-size: 13px; color: var(--ink-2); margin: 12px 0 4px; }
+  /* Scoped to the Ask panel: a viewer's own widgets (e.g. a music player) keep their styles. */
+  #ask textarea, #ask input, #ask select { width: 100%; font: inherit; color: var(--ink);
+      background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+  #ask textarea { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px;
+             min-height: 110px; resize: vertical; }
+  #ask input[type=range] { padding: 0; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  button { font: inherit; border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
+           color: var(--ink); padding: 6px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+                   width: 100%; padding: 10px; margin-top: 16px; font-weight: 600; }
+  button:disabled { opacity: .55; cursor: progress; }
+  .stats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .chip { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px;
+          color: var(--ink-2); }
+  .chip.warn { color: var(--warn); border-color: var(--warn); }
+  pre { background: var(--code); border-radius: 6px; padding: 12px; overflow-x: auto;
+        font-size: 13px; margin: 8px 0 0; white-space: pre-wrap; }
+  details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; margin-top: 12px; }
+  #history { list-style: none; padding: 0; margin: 0; }
+  #history li button { width: 100%; text-align: left; border: none; border-top: 1px solid var(--line);
+                       border-radius: 0; padding: 8px 4px; font-size: 13px; }
+  #history li button[aria-current=true] { color: var(--accent); font-weight: 600; }
+  .error { color: var(--warn); white-space: pre-wrap; }
+  .empty { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">slmkit playground</h1>
+  <span class="meta" id="meta">loading…</span>
+</header>
+<main>
+  <div>
+    <section class="panel" id="ask">
+      <h2>Ask</h2>
+      <div id="builder"></div>
+      <label for="prompt">Prompt, exactly as the model sees it</label>
+      <textarea id="prompt" spellcheck="false"></textarea>
+      <div class="hint" id="prompt-hint"></div>
+      <div class="row">
+        <div>
+          <label for="temperature">Temperature <span id="temperature-value"></span></label>
+          <input id="temperature" type="range" min="0" max="1.5" step="0.05">
+        </div>
+        <div>
+          <label for="max-tokens">Max new tokens</label>
+          <input id="max-tokens" type="number" min="1" max="4096">
+        </div>
+      </div>
+      <label for="seed">Seed <span class="hint">(empty = random; the one used is shown)</span></label>
+      <input id="seed" type="number" min="0" placeholder="random">
+      <button class="primary" id="go">Generate <span class="hint" style="color:inherit">Ctrl+Enter</span></button>
+    </section>
+    <section class="panel" style="margin-top:24px">
+      <h2>This session</h2>
+      <ul id="history"><li class="empty">Nothing generated yet.</li></ul>
+    </section>
+  </div>
+  <section class="panel" aria-live="polite">
+    <h2>Result</h2>
+    <div id="result"><p class="empty">Write or build a prompt, then Generate.</p></div>
+  </section>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+let info = null, viewer = null;
+const history = [];
+
+function text(tag, content, cls) {
+  const el = document.createElement(tag);
+  el.textContent = content;
+  if (cls) el.className = cls;
+  return el;
+}
+
+async function start() {
+  info = await (await fetch("/info")).json();
+  $("title").textContent = info.model;
+  $("meta").textContent = `${info.project} · ${info.stage === "sft" ? "fine-tuned (SFT)" : "pretrained base"}` +
+    ` · ${info.params.toLocaleString()} parameters · ${info.context_tokens}-token context · ${info.device}`;
+  document.title = `${info.model} · slmkit`;
+  $("prompt").value = info.example_prompt;
+  $("prompt-hint").textContent = "Example from the model card. The trailing newline matters.";
+  $("temperature").value = info.defaults.temperature;
+  $("max-tokens").value = info.defaults.max_new_tokens;
+  const params = new URLSearchParams(location.search);
+  if (params.has("prompt")) {
+    $("prompt").value = params.get("prompt");
+    $("prompt-hint").textContent = "From the link you opened.";
+  }
+  if (params.has("temperature")) $("temperature").value = params.get("temperature");
+  if (params.has("max_new_tokens")) $("max-tokens").value = params.get("max_new_tokens");
+  if (params.has("seed")) $("seed").value = params.get("seed");
+  showTemperature();
+  if (info.viewer) {
+    try {
+      viewer = await import(info.viewer);
+      if (viewer.setup) await viewer.setup({ info, container: $("builder"), setPrompt: (p) => { $("prompt").value = p; } });
+    } catch (err) {
+      $("builder").append(text("p", `The model's viewer failed to load: ${err}`, "error"));
+      viewer = null;
+    }
+  }
+  if (params.get("go") === "1") generate();
+}
+
+function showTemperature() {
+  const t = Number($("temperature").value);
+  $("temperature-value").textContent = `${t.toFixed(2)}${t === info?.defaults.temperature ? " (eval default)" : ""}`;
+}
+
+async function generate() {
+  const body = { prompt: $("prompt").value, temperature: Number($("temperature").value),
+                 max_new_tokens: Number($("max-tokens").value) };
+  if ($("seed").value !== "") body.seed = Number($("seed").value);
+  $("go").disabled = true;
+  $("result").replaceChildren(text("p", "Generating…", "empty"));
+  try {
+    const response = await fetch("/generate", { method: "POST",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const data = await response.json();
+    if (!response.ok) {
+      const detail = Array.isArray(data.detail) ? data.detail.map((d) => `${d.loc.at(-1)}: ${d.msg}`).join("\n") : JSON.stringify(data);
+      $("result").replaceChildren(text("p", `Request rejected (${response.status}):\n${detail}`, "error"));
+      return;
+    }
+    history.unshift({ result: data, at: new Date() });
+    show(0);
+  } catch (err) {
+    $("result").replaceChildren(text("p", `Could not reach the server: ${err}`, "error"));
+  } finally {
+    $("go").disabled = false;
+  }
+}
+
+async function show(index) {
+  const { result } = history[index];
+  const out = $("result");
+  out.replaceChildren();
+
+  const stats = document.createElement("div");
+  stats.className = "stats";
+  stats.append(text("span", result.finished ? "finished by itself (<eos>)" : "stopped at the token limit",
+                    result.finished ? "chip" : "chip warn"));
+  stats.append(text("span", `${result.new_tokens} tokens in ${result.seconds.toFixed(2)} s`, "chip"));
+  stats.append(text("span", `${Math.round(result.tokens_per_second)} tokens/s`, "chip"));
+  stats.append(text("span", `seed ${result.seed}`, "chip"));
+  stats.append(text("span", `temperature ${result.settings.temperature}`, "chip"));
+  if (result.unknown_prompt_tokens > 0) {
+    stats.append(text("span", `${result.unknown_prompt_tokens} prompt character(s) not in the vocabulary`, "chip warn"));
+  }
+  const reuse = text("button", "Reuse this seed");
+  reuse.addEventListener("click", () => { $("seed").value = result.seed; });
+  const link = text("button", "Copy link");
+  link.addEventListener("click", () => {
+    const q = new URLSearchParams({ prompt: result.text.slice(0, result.text.length - result.completion.length),
+      seed: result.seed, temperature: result.settings.temperature,
+      max_new_tokens: result.settings.max_new_tokens, go: 1 });
+    navigator.clipboard?.writeText(`${location.origin}/?${q}`);
+    link.textContent = "Link copied";
+  });
+  stats.append(reuse, link);
+  out.append(stats);
+
+  if (viewer?.render) {
+    const view = document.createElement("div");
+    out.append(view);
+    try {
+      await viewer.render({ info, result, container: view });
+    } catch (err) {
+      view.append(text("p", `The viewer could not draw this output: ${err}`, "error"));
+    }
+  }
+
+  const raw = document.createElement("details");
+  raw.open = !viewer;
+  raw.append(text("summary", "Raw text (prompt + completion)"));
+  raw.append(text("pre", result.text));
+  out.append(raw);
+  renderHistory(index);
+}
+
+function renderHistory(current) {
+  const list = $("history");
+  list.replaceChildren();
+  history.forEach((h, i) => {
+    const li = document.createElement("li");
+    const firstLine = h.result.text.split("\n").find((l) => l.trim()) || "(empty prompt)";
+    const b = text("button", `${h.at.toLocaleTimeString()} · seed ${h.result.seed} · ${firstLine}`);
+    b.setAttribute("aria-current", String(i === current));
+    b.addEventListener("click", () => show(i));
+    li.append(b);
+    list.append(li);
+  });
+}
+
+$("go").addEventListener("click", generate);
+$("temperature").addEventListener("input", showTemperature);
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) generate(); });
+start().catch((err) => { $("meta").textContent = `Could not load /info: ${err}`; });
+</script>
+</body>
+</html>

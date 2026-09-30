@@ -101,3 +101,16 @@ def test_export_cli_and_models_list(toy_run: str) -> None:
     assert "exported toy-model:1" in out.output
     listed = runner.invoke(app, ["models", "list"])
     assert listed.exit_code == 0 and "toy-model:1" in listed.output
+
+
+def test_a_project_viewer_is_copied_into_the_export(
+    toy_run: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, slm_home: Path
+) -> None:
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "viewer.js").write_text("export function render() {}\n")
+    project_cls = type(load_project("toy", {}, slm_home))
+    monkeypatch.setattr(project_cls, "web_viewer", lambda self: web)
+    path = export_run(toy_run, "toy-model", 1, **QUIET)
+    assert (path / "ui" / "viewer.js").read_text() == (web / "viewer.js").read_text()
+    assert artifacts.read_manifest(path)["stats"]["viewer"] == ["viewer.js"]

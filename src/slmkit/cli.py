@@ -594,8 +594,15 @@ def serve(
     host: str = typer.Option("127.0.0.1", help="Bind address. Keep it local; see DESIGN 6.9."),
     port: int = typer.Option(8000, help="TCP port."),
     device: str = typer.Option("cpu", help="cpu (default: these models are tiny), cuda, auto."),
+    threads: int = typer.Option(
+        2, min=1, help="CPU threads per generation. More than 2 gains nothing at these sizes."
+    ),
+    ui: str | None = typer.Option(
+        None, help="Serve this viewer directory instead of the export's ui/ (viewer development)."
+    ),
 ) -> None:
-    """Serve an exported model over HTTP: /health, /info, POST /generate."""
+    """Serve an exported model over HTTP: a playground page at /, and /health, /info, POST /generate."""
+    import torch
     import uvicorn
 
     from slmkit.export.hf import load_export
@@ -603,12 +610,19 @@ def serve(
     from slmkit.train.trainer import pick_device
 
     dev = pick_device(device)
+    # PyTorch's CPU default is one worker per core, and every Python thread that calls it gets its
+    # own set. The server generates on worker threads, so two sets compete for the same cores:
+    # measured 3.4 s instead of 0.58 s for one tune on 6 cores (serving.md §6).
+    torch.set_num_threads(threads)
     exported = load_export(model, dev)
     s = exported.manifest["stats"]
     typer.echo(f"{exported.ref}: {s['params']:,} params, {s['stage']}, from "
                f"{exported.manifest['inputs']['run']} step {s['step']} · device {dev}")  # fmt: skip
-    typer.echo(f"try: curl -s http://{host}:{port}/info")
-    uvicorn.run(create_app(exported, dev), host=host, port=port, log_level="info")
+    typer.echo(f"playground: http://{host}:{port}/   (API docs: http://{host}:{port}/docs)")
+    from pathlib import Path
+
+    app_ = create_app(exported, dev, Path(ui) if ui else None)
+    uvicorn.run(app_, host=host, port=port, log_level="info")
 
 
 @runs_app.command("summary")

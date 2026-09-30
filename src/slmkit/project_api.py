@@ -135,3 +135,11 @@ class Project(ABC):
         Default: the text itself. A project can add a rendering a person can use directly,
         e.g. MIDI for music or a PGN for chess."""
         return {".txt": text.encode()}
+
+    def web_viewer(self) -> Path | None:
+        """A directory of static files that draws this project's outputs in `slm serve`'s web
+        page, or None. It must contain `viewer.js`, an ES module (see
+        `src/slmkit/serve/static/index.html` for the functions it may export). `slm export`
+        copies it into the model as `ui/`, so the model carries its own viewer and the server
+        never loads project code (ADR 0008)."""
+        return None

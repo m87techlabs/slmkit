@@ -267,6 +267,10 @@ class AbcMusic(Project):
 
         return list(GRADERS)
 
+    def web_viewer(self) -> Path:
+        """Sheet music, in-browser playback and downloads for `slm serve`'s page (web/viewer.js)."""
+        return Path(__file__).parent / "web"
+
     def render_sample(self, prompt: EvalPrompt, text: str) -> dict[str, bytes]:
         """The tune as an `.abc` file any ABC app opens, and as MIDI to listen to, when abc2midi
         can play it. A tune it can't play gets only the `.abc`, so the failure stays visible."""
