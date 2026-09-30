@@ -90,6 +90,8 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 - [x] `export/hf.py` plus the HF parity test (checked on every export: logit difference 0.0 for char and BPE); `MODEL_CARD.md` generation; immutable `name:version` (ADR 0007).
 - [x] `serve/app.py` (FastAPI `/health`, `/info`, `/generate`).
 - [x] `export --to-windows` for MIDI (abc2midi) so you can listen on Windows (`Project.render_sample`, ADR 0007).
+- [x] A browser playground in `slm serve`: build a request, generate, see sheet music and play it
+      (`Project.web_viewer`, ADR 0008). Added after M2's plan, at the developer's request.
 - [x] Sweep nano vs micro, char vs BPE, with and without augmentation (3 seeds each), plus the
       micro × no-augmentation interaction cell; `slm runs summary` (experiments.md). micro wins; at
       equal compute transposition doesn't help on original-key tests, it buys robustness to key.

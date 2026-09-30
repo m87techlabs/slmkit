@@ -121,3 +121,13 @@ tunes that finish (98%) and end on the tonic more often ([sft.md](../../docs/con
 |---|---|---|
 | [`baseline.yaml`](experiments/baseline.yaml) | `nano` (0.85M), char | the first run: prove the pipeline (best val 1.2564 after 30M tokens, 0.01 GPU-h; **1.812 bpc** on full validation). `sft.enabled`: fine-tuned in 27 s to parity with header prompts |
 | [`bpe512.yaml`](experiments/bpe512.yaml) | `nano`, BPE 512 | the tokenizer A/B: identical to baseline except the tokenizer (**1.824 bpc**; see [tokenization.md §6](../../docs/concepts/tokenization.md)) |
+
+## Playground viewer
+
+`web/viewer.js` draws generated tunes as sheet music and plays them in `slm serve`'s browser
+playground (ADR 0008). `slm export` copies it into each model as `ui/`.
+
+| Third-party code | Source | Licence |
+|---|---|---|
+| abcjs 6.7.1 (loaded by the browser, not vendored) | https://cdn.jsdelivr.net/npm/abcjs@6.7.1/ , pinned with subresource integrity | MIT |
+| abcjs soundfont samples (fetched by abcjs at play time) | https://paulrosen.github.io/midi-js-soundfonts/ | MIT (the repository's licence) |

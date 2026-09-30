@@ -560,6 +560,8 @@ one allowed exception is `export --to-windows`.
   127.0.0.1. It serves the export, never a run directory, and needs no project code. Models are
   tiny, so CPU serving is the default. Applying the project's `logits_processor` arrives with the
   first project that has one (chess, M3).
+- `/` is a browser playground (one static page). A project may ship a viewer (`web_viewer()`,
+  ADR 0008) that the export carries as `ui/`: for ABC, sheet music and in-browser playback.
 - For anything worth keeping online, put an existing gateway in front rather than exposing
   `slm serve` directly — it handles auth, rate limiting and TLS, which this app deliberately
   does not.

@@ -182,6 +182,21 @@ it's always available, needs no CUDA initialization, and leaves the GPU free for
 adding a KV cache now. It would complicate the sampler that training and eval share, for a model that
 already answers in under a second.
 
+**A trap found later: threads.** Those timings were taken on a machine where WSL had 24 CPUs. With 6,
+the server took 3.4 s per tune where a script took 0.53 s. PyTorch's CPU default is one worker thread per
+core, and *each Python thread that calls it gets its own set*. The server generates on worker threads
+(FastAPI runs ordinary endpoints in a thread pool), so two sets of six threads compete for six cores.
+Measured, per 244-token tune:
+
+| intra-op threads | from the main thread | from a server worker thread |
+|---|---|---|
+| 6 (the default here) | 0.53 s (before any other thread used PyTorch) | 3.3–3.5 s |
+| 1 | 0.91 s | 0.87 s |
+| 2 | 0.66 s | 0.58 s |
+
+So `slm serve` sets 2 threads on the CPU (`--threads`). This is **oversubscription**, a classic
+throughput trap: more threads than cores, each waiting on the others.
+
 ---
 
 ## 7. Listening: `--to-windows`
@@ -203,7 +218,50 @@ Graders set a floor, and a person listening still catches what they can't.
 
 ---
 
-## 8. What export doesn't do yet
+## 8. The playground: trying a model in the browser
+
+![The slm serve playground, drawing and playing a generated jig](../images/playground.png)
+
+*Captured with headless Chrome from a running `slm serve` (runbook §E.6 has the command).*
+
+`slm serve` also answers `/` with a single-page **playground**: write or build a prompt, choose the
+temperature and seed, generate, and see the result. The page is generic, with no knowledge of music.
+It uses the same `/info` and `/generate` endpoints as `curl`, and shows the statistics every response
+carries: whether the model finished by itself, tokens per second, the seed (with a link that reproduces
+the result), and a warning when the prompt contains characters the vocabulary doesn't have.
+
+**What a result looks like is the project's decision.** A project may ship a small viewer (ADR 0008):
+a directory with `viewer.js`, an ES module that exports `setup()` (controls that build a prompt) and
+`render()` (draw one result). `slm export` copies it into the model as `ui/`, the page imports it from
+`/ui/viewer.js`, and the server only hands the files out. It never runs project code, so an export is
+still everything needed to serve the model.
+
+`abc_music`'s viewer:
+
+- **builds requests** in the format the model was trained on: plain words ("a jig in G major, 6/8
+  time") for a fine-tuned model, ABC headers (`R:jig / M:6/8 / L:1/8 / K:G`) for a base model, offering
+  only the rhythms, meters and keys the corpus has most of (experiments.md §5);
+- **draws sheet music and plays it** with abcjs, a JavaScript ABC library, in fiddle, piano, flute,
+  accordion or harp sound, highlighting each note as it plays;
+- **reports what abcjs couldn't read**, the browser's view of the `plays` grader;
+- **offers `.abc` and `.mid` downloads** of exactly what is on screen.
+
+**Rejected:** rendering MIDI on the server with `abc2midi`, as `--to-windows` does. The server would
+then need project code and a system tool; abcjs does both drawing and playing in the browser.
+**Rejected:** a JavaScript framework and build step. One HTML file with no dependencies keeps it
+readable and makes `slm serve` itself need nothing new.
+
+abcjs comes from a CDN (jsDelivr), pinned to one version, with a **subresource integrity** hash: the
+browser checks the file against it and refuses anything else. The playback samples (a "soundfont") are
+also fetched by the browser. So the page needs internet access for the viewer; without it, the
+playground still generates and shows raw text.
+
+To work on a viewer without re-exporting, point the server at the project's copy:
+`slm serve --model abc-folk:1 --ui projects/abc_music/web`.
+
+---
+
+## 9. What export doesn't do yet
 
 - **GGUF** for llama.cpp and Ollama (M4). A char-level vocabulary needs a custom tokenizer mapping
   there, verified per project.

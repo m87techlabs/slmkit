@@ -523,6 +523,15 @@ responses back. A **422** response means the request body failed validation.
 (Web Server Gateway Interface) is synchronous, ASGI (Asynchronous Server Gateway Interface) its
 async successor. Uvicorn is an ASGI server; FastAPI is an ASGI app.
 
+**ES module.** A JavaScript file that declares what it `export`s and is loaded with `import`, natively
+in every current browser. The playground loads a model's `viewer.js` this way.
+
+**SRI — Subresource Integrity.** A hash in a `<script>` or `<link>` tag. The browser downloads the file,
+hashes it, and refuses to use it if the hash differs, so a CDN can't serve changed code.
+
+**Oversubscription.** More busy threads than CPU cores: they take turns and all slow down. In `slm
+serve` it made generation 6× slower until the thread count was capped (serving.md §6).
+
 **TLS — Transport Layer Security.** The encryption behind HTTPS. `slm serve` has none on purpose and
 binds to localhost; a gateway in front provides it (M4).
 

@@ -1008,6 +1008,59 @@ also how Phase E found the eval-prompt flaw (C.6): a hornpipe that sounded right
 
 ---
 
+## E.6 Play with it in the browser
+
+The playground at `/` builds a request, generates, draws the tune as sheet music and plays it
+(serving.md §8, ADR 0008). The viewer is copied into models at export time, so export a version that
+carries it:
+
+```bash
+uv run slm export run-9b89 --name abc-folk --version 2
+ls ~/slm/models/abc-folk/2/ui
+uv run slm serve --model abc-folk:2
+```
+```
+viewer.js
+abc-folk:2: 864,256 params, sft, from run-9b890db6dced step 1000 · device cpu
+playground: http://127.0.0.1:8000/   (API docs: http://127.0.0.1:8000/docs)
+```
+
+(`abc-folk:1` was exported before viewers existed, so it has no `ui/`. To use the repo's viewer with it
+anyway: `uv run slm serve --model abc-folk:1 --ui projects/abc_music/web`.)
+
+Open **http://localhost:8000/** in a browser on Windows. Then:
+
+1. **Ask for** "a jig (6/8)" **in the key of** "G major": the prompt becomes `% a jig in G major, 6/8
+   time`. Generate (or Ctrl+Enter).
+2. Press **play** under the result: the notes highlight as they sound. Try other instruments, and the
+   BPM box to slow it down.
+3. **Reuse this seed** and Generate again: the same tune, note for note. Change the temperature to 0.3,
+   then 1.2, with the same seed, and compare.
+4. Change the key to "Bb major" or the form to "a slip jig (9/8)", or type a request of your own. Try
+   `% Write a jig?`: the page warns that 2 prompt characters aren't in the vocabulary.
+5. **Copy link** gives a URL that reproduces the result, e.g.
+   `http://localhost:8000/?prompt=%25%20a%20jig%20in%20G%20major%2C%206%2F8%20time%0A&seed=3&go=1`.
+
+Also try the base model, `uv run slm serve --model abc-folk-base:1 --ui projects/abc_music/web`: the
+builder writes ABC headers instead of words, because that's what a base model understands.
+
+**Check it without clicking** (this is how the screenshot in serving.md §8 was made): with the server
+running, from WSL,
+
+```bash
+"/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu \
+  --window-size=1400,1000 --virtual-time-budget=20000 --screenshot='C:\Users\Public\playground.png' \
+  "http://localhost:8000/?prompt=%25%20a%20jig%20in%20G%20major%2C%206%2F8%20time%0A&seed=3&go=1"
+```
+
+and open `C:\Users\Public\playground.png`. (Microsoft Edge works the same way:
+`/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`.)
+
+**Measured:** one tune takes about 0.6 s on the CPU. The first version took 3.4 s, because PyTorch's
+CPU threads multiplied across server threads; `slm serve --threads` (default 2) fixed it (serving.md §6).
+
+---
+
 ## Phase E: done when
 
 - [x] `make test` (188), `make test-gpu` (4) and `make lint` pass.
@@ -1017,6 +1070,7 @@ also how Phase E found the eval-prompt flaw (C.6): a hornpipe that sounded right
 - [x] `slm serve` answers `/health`, `/info` and `/generate`, validates requests, and reports unknown
       prompt characters.
 - [x] `--to-windows` writes `.abc` and `.mid` files with a graded index.
+- [x] `slm serve` has a browser playground; `abc_music`'s viewer draws and plays tunes (E.6, ADR 0008).
 - [x] **You** have run E.1–E.5, and listened to a generated tune on Windows: it sounds like a tune.
 
 ---

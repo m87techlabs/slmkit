@@ -490,6 +490,7 @@ the engine never imports a project library.
 |---|---|---|---|---|
 | **music21** | ABC (M2) | Toolkit for analysing music notation (BSD-3-Clause) | Ships the public-domain ABC tune books slmkit trains on; MIDI reading in tests. **Not** used to judge ABC pitch: it doesn't carry accidentals through a bar as the ABC standard requires (data-preparation.md §4) | [docs](https://www.music21.org/music21docs/) |
 | **ABC notation** | ABC (M2) | Plain-text melody format | The corpus *and* the model's output language | [standard](https://abcnotation.com/wiki/abc:standard) |
+| **abcjs** | ABC (M2) | JavaScript library that draws ABC as sheet music and plays it with Web Audio (MIT) | The `slm serve` playground's viewer (`projects/abc_music/web/viewer.js`, ADR 0008). Loaded by the browser from jsDelivr, pinned to 6.7.1 with subresource integrity; not installed. Rejected: server-side MIDI with `abc2midi`, which would put project code in the server | [docs](https://paulrosen.github.io/abcjs/) |
 | **Public-domain tune books** | ABC (M2) | Ryan's Mammoth (1883), O'Neill's (1903), Aird's (1778–1803), as ABC in `music21` | Training corpus, 4,248 tunes | [ADR 0005](decisions/0005-abc-data-source.md) |
 | **python-chess** | Chess (M3) | Move generation, PGN parsing, legality | Legal-move grader and legal-move-masked decoding | [docs](https://python-chess.readthedocs.io/) |
 | **Stockfish** | Chess (M3) | Strongest open-source chess engine | Fixed-strength opponent to measure Elo | [site](https://stockfishchess.org/) |
