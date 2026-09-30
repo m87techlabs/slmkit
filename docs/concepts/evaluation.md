@@ -89,7 +89,8 @@ Reading it:
 graders show what loss can't: char's samples play far more often (0.65 vs 0.49, a gap of about eight
 times the spread, so real for *these two models*). BPE gets slightly more bars right (0.73 vs 0.71), but
 that gap is only about twice the spread, which is the edge of what 3 sampling seeds can resolve.
-Whether either holds across training seeds is what Phase F measures.
+Across three training seeds (experiments.md §3), char's lead on plays held (0.619 vs 0.548) and the bars
+gap vanished (0.727 vs 0.735): one run's gap, measured against sampling noise alone, overstated it.
 
 **Why samples fail to play.** `plays` is strict: any `Error` line from `abc2midi` fails the sample,
 including ones it recovers from. Tallying the errors in 200 samples per model (with the original
@@ -187,7 +188,8 @@ was removed. Without the baseline column, it would have gone into this page as a
 The models' 0.19–0.21 is barely better than that. Ending on the tonic is a long-range pattern: the last
 note has to refer back to the key stated at the top, hundreds of characters earlier. A 0.86M-parameter
 model captures the local rules (bar lengths, note shapes) far better than that kind of long-range
-structure. That makes `ends_on_tonic` one of the metrics to watch as models grow in Phase F.
+structure. That makes `ends_on_tonic` one of the metrics to watch as models grow. In Phase F, `micro`
+(5.7× the parameters) reached 0.356, and 0.416 without transposition (experiments.md §4).
 
 Some samples also fall into a loop (`c2c c2c c2c …`) and never finish; `ended` and `length` together
 show how often.

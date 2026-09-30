@@ -21,4 +21,5 @@ until its pages exist — the documentation is part of the deliverable, not a fo
 | [`data-preparation.md`](data-preparation.md) | M2 ◐ | Licences, near-duplicates, honest augmentation, and verifying a transformation against an oracle |
 | [`evaluation.md`](evaluation.md) | M2 ◐ | Graders, baselines, calibrating graders on real data, sampling vs training seeds, reading the samples, and asking only for what the data contains |
 | [`sft.md`](sft.md) | M2 ◐ | Base vs fine-tuned models, masking the loss to the answer, the frozen vocabulary, and parity as the pass mark |
+| [`experiments.md`](experiments.md) | M2 ◐ | Sweeps: one factor at a time, equal compute, training vs sampling seeds; what model size, the tokenizer and augmentation did; what "parse rate" should mean |
 | [`serving.md`](serving.md) | M2 ◐ · M4 | Checkpoint vs export, the HF format, parity checks, immutable versions, what `slm serve` does per request, CPU vs GPU latency, listening on Windows; GGUF and packaging in M4 |

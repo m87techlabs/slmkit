@@ -289,9 +289,58 @@ def watch_it_learn() -> None:
     print("wrote docs/images/watch-it-learn.gif")
 
 
+def abc_sweep() -> None:
+    """M2 Phase F: every pretraining experiment, one dot per training seed, the mean in blue.
+
+    Read by `slm runs summary`'s own code, so the figure and the table can't disagree. The
+    baseline's mean is a vertical line through each panel: the thing every row is compared with.
+    """
+    from slmkit.eval.summary import summarize
+
+    rows = [("baseline", "baseline\nnano · char · transposed"),
+            ("noaug", "noaug\nno transposition"),
+            ("bpe512", "bpe512\nBPE-512 tokenizer"),
+            ("micro", "micro\n5.7× the parameters"),
+            ("micro_noaug", "micro_noaug\nmicro, no transposition")]  # fmt: skip
+    groups = {g.experiment.split("/")[1]: g for g in summarize("headers", "abc_music")
+              if g.stage == "pretrain"}  # fmt: skip
+    rows = [r for r in rows if r[0] in groups]
+    panels = [("best val bpc", "bits per character (lower is better)"),
+              ("plays", "plays: abc2midi, no errors"),
+              ("bar_accuracy", "bar accuracy"),
+              ("ends_on_tonic", "ends on the tonic")]  # fmt: skip
+    fig, axes = plt.subplots(1, len(panels), figsize=(13, 0.62 * len(rows) + 1.4), sharey=True)
+    for ax, (metric, title) in zip(axes, panels, strict=True):
+        base = groups["baseline"].stats[metric]["mean"]
+        ax.axvline(base, color=AXIS, lw=1 * PX, zorder=1)
+        for i, (key, _) in enumerate(rows):
+            g = groups[key]
+            y = len(rows) - 1 - i
+            for r in g.per_run:
+                ax.plot([r[metric]], [y], "o", ms=MARK * 0.8, color=MUTED, mec=SURFACE,
+                        mew=1.5 * PX, zorder=3, alpha=0.9)  # fmt: skip
+            mean = g.stats[metric]["mean"]
+            ax.plot([mean], [y], "D", ms=MARK * 1.05, color=TRAIN, mec=SURFACE, mew=2 * PX,
+                    zorder=5)  # fmt: skip
+            ax.text(mean, y + 0.28, f"{mean:.3f}", color=INK_2, fontsize=10 * PX, ha="center",
+                    va="bottom")  # fmt: skip
+        ax.set_title(title, loc="left", color=INK, fontsize=12 * PX)
+        ax.set_ylim(-0.6, len(rows) - 0.3)
+        ax.grid(axis="y", visible=False)
+    axes[0].set_yticks(range(len(rows)), [label for _, label in reversed(rows)])
+    fig.suptitle("abc_music, Phase F: 3 training seeds per experiment, 30M tokens each",
+                 x=0.01, ha="left", color=INK, fontsize=15 * PX, fontweight="bold")  # fmt: skip
+    fig.text(0.01, -0.02, "grey dots: one training seed each (its eval averages 3 sampling seeds × "
+             "200 samples) · blue diamond: mean · vertical line: baseline mean",
+             color=MUTED, fontsize=10 * PX, ha="left")  # fmt: skip
+    fig.tight_layout()
+    save(fig, "abc-sweep.png")
+
+
 if __name__ == "__main__":
     fit_expected()
     fit_actual()
     lr_schedule()
     mfu_by_preset()
     watch_it_learn()
+    abc_sweep()

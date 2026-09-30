@@ -375,7 +375,26 @@ for a trivial reason measures nothing.
 real examples don't score near the top, the grader is wrong.
 
 **Sampling seed vs training seed.** A sampling seed changes which samples one model draws (noise in
-the measurement); a training seed changes the model itself (noise in the result). slmkit reports both.
+the measurement); a training seed changes the model itself (noise in the result). slmkit reports both:
+`slm eval`'s ± is the first, `slm runs summary`'s ± the second.
+
+**Sweep.** A set of runs that vary one or more settings, to learn how the result depends on them.
+slmkit's sweeps are loops over `slm run` with one YAML per configuration.
+
+**Ablation.** An experiment that removes one component (augmentation, a layer, a feature) to measure
+what it contributed. `noaug` is an ablation of transposition.
+
+**Equal compute.** Comparing configurations at the same training budget (here the same number of
+tokens read), so a difference can't just be "trained for longer".
+
+**Interaction.** When the effect of one change depends on another, e.g. if augmentation helped a large
+model but not a small one. A one-factor-at-a-time sweep can't see interactions; testing one needs the
+combined configuration (`micro_noaug`).
+
+**Capacity-limited / data-limited.** A capacity-limited model is still improving on held-out data
+when training stops: it can't yet fit what it has, and needs size or more steps. A data-limited model
+has started to memorize its training set (the train/val gap widens): it needs more, or more varied,
+data.
 
 **Held-out.** Data the model never trained on.
 

@@ -10,8 +10,8 @@ Built up phase by phase, like the M1 runbook.*
 | **B** | BPE tokenizer, compared with char by bits per character | ☑ |
 | **C** | Graders, `slm eval`, `slm runs compare` | ☑ |
 | **D** | SFT: prompts from headers, loss on the answer only | ☑ |
-| **E** | Export, serve, listen on Windows | ☑ this page |
-| F | Sweeps, exit criteria | ☐ |
+| **E** | Export, serve, listen on Windows | ☑ |
+| **F** | Sweeps, exit criteria | ☑ this page |
 
 Run everything from the repo root, with the extras installed (`uv sync --all-extras`: the project
 needs `music21`, and the checks need `abc2midi` from the setup script).
@@ -1018,3 +1018,182 @@ also how Phase E found the eval-prompt flaw (C.6): a hornpipe that sounded right
       prompt characters.
 - [x] `--to-windows` writes `.abc` and `.mid` files with a graded index.
 - [x] **You** have run E.1–E.5, and listened to a generated tune on Windows: it sounds like a tune.
+
+---
+
+# Phase F: sweeps and exit criteria
+
+*Concepts: [`../concepts/experiments.md`](../concepts/experiments.md). Code:
+[`src/slmkit/eval/summary.py`](../../src/slmkit/eval/summary.py), the experiment YAMLs in
+[`projects/abc_music/experiments/`](../../projects/abc_music/experiments/), and
+[`projects/abc_music/check_sweep.py`](../../projects/abc_music/check_sweep.py).*
+
+## F.0 The checks
+
+```bash
+make test                                        # 191 passed
+uv run pytest -q tests/unit/test_summary.py      # 3 passed
+```
+
+`test_summary_averages_over_training_seeds` trains the toy project with two seeds and checks that the
+summary's mean and spread are exactly `statistics.fmean` and `stdev` of the per-run values.
+`test_run_trains_then_evaluates_each_stage` checks that `slm run` evaluates what it trained and reuses
+the report the second time.
+
+---
+
+## F.1 The experiments are YAML only
+
+```bash
+diff projects/abc_music/experiments/baseline.yaml projects/abc_music/experiments/noaug.yaml
+```
+
+Besides comments and the run name, the only difference is `transpose_semitones: []` (and `noaug`
+has no `sft:` section). `micro.yaml` changes `preset: micro`, and `micro_noaug.yaml` changes both.
+No engine or project code changed to add them: the framework check.
+
+---
+
+## F.2 Run the sweep
+
+In tmux: about 13 minutes wall-clock, 0.13 GPU-hours in all. It resumes if interrupted; re-run the
+same loop.
+
+```bash
+for exp in baseline bpe512 micro noaug micro_noaug; do
+  for seed in 1337 1 2; do
+    uv run slm run abc_music/$exp --set run.seed=$seed || break 2
+  done
+done 2>&1 | tee ~/slm/sweep-m2.log
+```
+
+Each `slm run` trains (or finds the run complete), fine-tunes if the experiment has `sft.enabled`
+(only `baseline`), and evaluates each stage: 3 sampling seeds × 200 samples, or `already exists`.
+
+**Why a loop and not a sweep tool:** every step already resumes and skips completed work, so a shell
+loop is a complete, restartable sweep. A scheduler would add a dependency and solve nothing here.
+
+---
+
+## F.3 Read the summary
+
+```bash
+uv run slm runs summary --project abc_music
+```
+```
+experiment         abc_music/baseline     abc_music/baseline       abc_music/bpe512        abc_music/micro  abc_music/micro_noaug        abc_music/noaug
+stage                        pretrain                    sft               pretrain               pretrain               pretrain               pretrain
+runs                  3 (3 evaluated)        3 (3 evaluated)        3 (3 evaluated)        3 (3 evaluated)        3 (3 evaluated)        3 (3 evaluated)
+seeds                        1,2,1337               1,2,1337               1,2,1337               1,2,1337               1,2,1337               1,2,1337
+GPU-h                            0.02                   0.02                   0.01                   0.03                   0.03                   0.02
+eval prompts                  headers                    sft                headers                headers                headers                headers
+best val loss           1.218 ± 0.046          1.030 ± 0.076          2.272 ± 0.078          0.996 ± 0.009          0.957 ± 0.055          1.149 ± 0.051
+best val bpc            1.757 ± 0.067                      -          1.763 ± 0.060          1.436 ± 0.013          1.381 ± 0.080          1.657 ± 0.074
+ended                   0.922 ± 0.014          0.981 ± 0.001          0.963 ± 0.014          0.953 ± 0.012          0.979 ± 0.011          0.954 ± 0.013
+length                272.261 ± 9.612        261.168 ± 6.733       292.920 ± 20.561        249.022 ± 5.428       220.609 ± 10.357       257.343 ± 16.348
+plays                   0.619 ± 0.038          0.677 ± 0.049          0.548 ± 0.049          0.722 ± 0.009          0.743 ± 0.050          0.662 ± 0.033
+bar_accuracy            0.727 ± 0.020          0.800 ± 0.050          0.735 ± 0.012          0.782 ± 0.031          0.813 ± 0.004          0.762 ± 0.013
+ends_on_tonic           0.231 ± 0.025          0.328 ± 0.015          0.231 ± 0.049          0.356 ± 0.059          0.416 ± 0.040          0.296 ± 0.033
+novelty                 0.998 ± 0.000          0.996 ± 0.002          0.993 ± 0.005          0.997 ± 0.001          0.998 ± 0.001          0.998 ± 0.001
+```
+
+Each ± is the spread across the three **training** seeds (`slm eval`'s ± is sampling noise within one
+model). The SFT column is scored with plain-language requests, the others with header prompts. Read
+across (experiments.md §2–§6):
+
+- **micro beats nano** on everything, by several spreads.
+- **char vs BPE:** bits per character tie (1.757 vs 1.763), as in Phase B; char plays more often;
+  Phase C's bar-accuracy gap has gone.
+- **noaug beats baseline**, and micro_noaug matches or beats micro: the surprise of this phase (F.5).
+- **SFT stays ahead of the header prompt** on every grader, across all three seeds.
+
+To see it as a picture: `make figures` writes `docs/images/abc-sweep.png` from the same code (needs
+`uv sync --extra docs`).
+
+---
+
+## F.4 Check for overfitting
+
+```bash
+uv run python - <<'PY'
+import json
+from slmkit.train.run import list_runs
+for d, st in sorted(list_runs(), key=lambda r: r[1].get("experiment", "")):
+    if st.get("experiment", "").startswith("abc_music/") and st.get("stage", "pretrain") == "pretrain":
+        ev = [json.loads(x) for x in open(d / "metrics.jsonl") if '"eval"' in x]
+        best = min(ev, key=lambda e: e["val_loss"])
+        print(f"{st['experiment']:<22} {d.name}  best step {best['step']:>4}  "
+              f"end gap {ev[-1]['val_loss'] - ev[-1]['train_loss']:+.3f}")
+PY
+```
+```
+abc_music/baseline     run-6b3967166fa0  best step  916  end gap +0.058
+abc_music/baseline     run-70f7e9180ffd  best step  916  end gap +0.063
+abc_music/baseline     run-749d028accd4  best step  916  end gap +0.064
+…
+abc_music/micro        run-a9651520abda  best step  500  end gap +0.359
+abc_music/micro_noaug  run-c183e88ed53f  best step  750  end gap +0.374
+…
+```
+
+nano runs end with a train/val gap of about +0.06 and their best checkpoint at the last step: still
+improving, **capacity-limited**. micro runs end at +0.31 to +0.36 with validation flat from about step
+750: memorizing, **data-limited**. That difference is what motivated `micro_noaug` (experiments.md §4).
+
+---
+
+## F.5 Why no transposition wins: test on transposed tunes
+
+First rule out leakage, then score both ways:
+
+```bash
+uv run python projects/abc_music/check_sweep.py overlap
+uv run python projects/abc_music/check_sweep.py keys
+```
+```
+validation, original keys   vs baseline train   0.3% of 32-character windows seen; 0 of 412 tunes more than half seen
+validation, original keys   vs noaug train      0.2% of 32-character windows seen; 0 of 412 tunes more than half seen
+validation, transposed      vs baseline train   0.3% of 32-character windows seen; 0 of 825 tunes more than half seen
+validation, transposed      vs noaug train      0.1% of 32-character windows seen; 0 of 825 tunes more than half seen
+…
+bpc             original keys       transposed  difference
+baseline        1.744 ± 0.068    1.756 ± 0.072      +0.012
+noaug           1.644 ± 0.076    1.830 ± 0.086      +0.185
+micro           1.419 ± 0.016    1.247 ± 0.131      -0.172
+micro_noaug     1.361 ± 0.079    1.569 ± 0.101      +0.208
+```
+
+No leakage. Models trained without transposition are ~0.19 bits per character worse on the same tunes
+moved two semitones; with it, no penalty. Transposition buys robustness to key, and the evaluation's
+prompts and validation tunes are all in the tune books' own keys, so it doesn't reward that. (micro
+doing *better* on transposed copies is unexplained; experiments.md §5 records it as open.)
+
+**Why:** a surprising result is a question about the measurement before it's a finding about the model.
+
+---
+
+## F.6 What "parse rate" means
+
+```bash
+uv run python projects/abc_music/check_sweep.py parse
+uv run python projects/abc_music/check_sweep.py temperature
+```
+```
+                                    parses  makes MIDI  plays, no error
+baseline run-6b3967166fa0            1.000       1.000            0.560
+…
+micro_noaug run-a7889b63ebf5         1.000       1.000            0.785
+micro_noaug run-c183e88ed53f         1.000       1.000            0.725
+random characters (baseline)         0.915       0.915            0.045
+
+run-a7889b63ebf5, 200 samples per temperature, sampling seed 0
+T=1.0  plays 0.620  bar_accuracy 0.767  ended 0.995  novelty 1.000
+T=0.8  plays 0.785  bar_accuracy 0.815  ended 0.995  novelty 1.000
+T=0.6  plays 0.850  bar_accuracy 0.801  ended 0.920  novelty 0.974
+T=0.4  plays 0.890  bar_accuracy 0.825  ended 0.840  novelty 0.915
+T=0.2  plays 0.945  bar_accuracy 0.846  ended 0.860  novelty 0.957
+```
+
+Random characters "parse" 91.5% of the time, because `abc2midi` recovers from almost anything; only
+the strict `plays` means something. Lowering the temperature raises `plays` towards 95% by making tunes
+loop and copy instead (experiments.md §8).

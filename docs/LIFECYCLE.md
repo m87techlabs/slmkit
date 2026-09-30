@@ -229,7 +229,7 @@ and ends when its exit criteria are met ([`ROADMAP.md`](ROADMAP.md)).
 |---|---|---|---|---|---|---|
 | Environment + tooling | ☑ | | | | | |
 | Collect / split / tokenize / pack | | ☑ char | BPE, augmentation | fixed vocab, streaming, exclusions | | ball-event vocab |
-| Pretrain + evaluate | | ☑ | sweeps, ≥ 3 seeds | scaling study | | larger runs |
+| Pretrain + evaluate | | ☑ | ☑ sweeps, 3 seeds | scaling study | | larger runs |
 | Graders | | by hand (novelty) | ☑ | legal moves, Elo | | calibration |
 | Fine-tune (SFT) | | | ☑ | | | |
 | Export + serve | | parity proven | ☑ export, serve, MIDI | legal-move masking | GGUF, container, gateway | |

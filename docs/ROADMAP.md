@@ -90,8 +90,10 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
 - [x] `export/hf.py` plus the HF parity test (checked on every export: logit difference 0.0 for char and BPE); `MODEL_CARD.md` generation; immutable `name:version` (ADR 0007).
 - [x] `serve/app.py` (FastAPI `/health`, `/info`, `/generate`).
 - [x] `export --to-windows` for MIDI (abc2midi) so you can listen on Windows (`Project.render_sample`, ADR 0007).
-- [ ] Sweep nano vs micro, char vs BPE, with and without augmentation (3 seeds each).
-- [ ] Write `docs/runbooks/m2-abc-music.md` (verify by hand: ingest, splits, graders, listen to output).
+- [x] Sweep nano vs micro, char vs BPE, with and without augmentation (3 seeds each), plus the
+      micro × no-augmentation interaction cell; `slm runs summary` (experiments.md). micro wins; at
+      equal compute transposition doesn't help on original-key tests, it buys robustness to key.
+- [x] Write `docs/runbooks/m2-abc-music.md` (verify by hand: ingest, splits, graders, listen to output).
 - [x] Write `docs/concepts/`: `sft.md` (why loss masking, how base and instruct models differ)
       and `evaluation.md` (why programmatic graders, why ≥3 seeds, what a baseline is for).
 
@@ -105,7 +107,8 @@ Goal: exercise every stage end-to-end — tokenizer, pretrain, SFT, eval, export
       Bars 0.851 vs 0.708, tonic 0.340 vs 0.212 (runbook D.3, re-measured in Phase E).
 - [x] An exported model loads in HF `transformers` with matching logits (difference 0.0) and serves
       via `slm serve`.
-- [ ] **Framework check:** a new ABC experiment is a YAML file only. *(Phase F's sweep experiments.)*
+- [x] **Framework check:** a new ABC experiment is a YAML file only (`micro`, `noaug` and
+      `micro_noaug` needed no code).
 - [x] You have listened to a generated tune on Windows and it sounds like a tune.
 
 ---

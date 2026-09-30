@@ -125,7 +125,9 @@ Reading it:
   so the fine-tuned model finishes 98% of the time and ends on the tonic more often (0.34 vs 0.21).
 - **Part of that gain is simply more training.** SFT is 16.8M more tokens on the same tunes, 56% on top
   of pretraining's 30M. Continuing *pretraining* for the same tokens would separate "more training" from
-  "request → answer training". One training seed, too; Phase F repeats it.
+  "request → answer training". One training seed, too. Phase F repeated it with three: plays 0.677 ±
+  0.049, bars 0.800 ± 0.050, tonic 0.328 ± 0.015 against the base model's 0.619 / 0.727 / 0.231, so SFT
+  stays ahead across seeds and this table's seed was the high end (experiments.md §6).
 
 (A first version of this table showed bare parity, bars 0.689 vs 0.677. Its requests didn't state the
 meter the grader checked, and asked for a 4/4 reel and hornpipe, which the corpus almost never has. See
@@ -159,4 +161,5 @@ F EFG A2 B | cde d2 B AFC | …                K:G
   something cheerful" means nothing to it. The requests are a small, closed language, and only
   scale changes that.
 - **Fix the tonic problem.** Ending on the tonic improved, but 0.34 is still far below real tunes' 0.80.
-  That's a model-size limit (evaluation.md §5), which Phase F measures.
+  That's a model-size limit (evaluation.md §5). Phase F confirmed it: `micro` reaches 0.36, and 0.42
+  without transposition (experiments.md §4).

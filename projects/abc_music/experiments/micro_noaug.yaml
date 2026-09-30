@@ -1,0 +1,37 @@
+# The interaction cell: micro.yaml with noaug.yaml's one change (no transposition). Added after the
+# first sweep showed nano still improving at its last step (capacity-limited: augmentation didn't
+# help) while micro overfits from half-way (data-limited: where augmentation should help). Comparing
+# micro with micro_noaug tests that; comparing baseline with noaug alone could not.
+run:
+  name: abc-micro-noaug
+  seed: 1337
+  tracker: tensorboard
+project:
+  name: abc_music
+  args:
+    transpose_semitones: []
+    max_key_accidentals: 3
+    header_dropout: 0.4
+tokenizer:
+  type: char
+data:
+  block_size: 512
+  val_fraction: 0.1
+  append_eos: true
+model:
+  preset: micro
+  overrides: {dropout: 0.1}
+train:
+  preset: default
+  max_tokens: 30_000_000
+  batch_size: 64
+  lr: 1.0e-3
+  warmup_tokens: 1_000_000
+  eval_every_steps: 250
+  eval_iters: 50
+  eval_samples: 2
+  sample_tokens: 400
+eval:
+  num_samples: 200
+  seeds: [0, 1, 2]
+  temperature: 0.8

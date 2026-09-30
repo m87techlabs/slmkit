@@ -265,7 +265,9 @@ eval  step    916  train 2.1510  val 2.3531  (gap +0.2021, 1.826 bpc)  * best
 ```
 
 **Reading the result.** At equal compute, on this corpus, the tokenizer barely matters for
-prediction quality, and a single seed can't separate 1.812 from 1.824 (Phase F runs three).
+prediction quality, and a single seed can't separate 1.812 from 1.824. Phase F ran three seeds each:
+**1.757 ± 0.067 (char) vs 1.763 ± 0.060 (BPE)**, a tie confirmed. On the graders, char plays more often
+(0.619 vs 0.548) and bar accuracy is the same (0.727 vs 0.735); see experiments.md §3.
 Differences that do show:
 
 - **BPE sees 1.86× more text** for the same compute and the same 512-token context. That helps with

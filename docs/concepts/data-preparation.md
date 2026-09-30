@@ -83,6 +83,13 @@ Rules that keep it honest:
 
 Result: 3,829 training tunes → **11,316 documents** (2.96×), 2.85M tokens.
 
+**Did it help? Not with what the evaluation asks.** The Phase F sweep (experiments.md §5) trained
+with and without transposition at equal compute, 3 seeds each. Without it, models scored *better* on
+the validation tunes in their original keys (1.657 vs 1.757 bits per character at nano size), and
+about 0.19 bits per character *worse* on the same tunes transposed. Transposition buys robustness to
+key; an evaluation in common keys doesn't reward it. Correct as a transformation is not the same as
+useful for the test.
+
 **Header dropout** is a second, different kind of augmentation: 40% of documents lose some of their
 `R:`/`M:`/`K:` lines. It creates no new music; it teaches the model to write a tune without being
 told its rhythm, meter or key. It also sets up the M2 SFT comparison: the base model is familiar with
