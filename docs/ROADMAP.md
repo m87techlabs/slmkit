@@ -135,13 +135,13 @@ buttons execute read-only commands from a fixed list only. *~3–4 sessions, no 
       exported model). ADR 0009, `runbooks/studio.md`, a "See it in slm studio" section per project runbook.
 - [x] **Phase 2:** **Learn** (concepts, ADRs and runbooks rendered, diagrams, glossary on hover),
       **Experiments** (sweeps, seeds, spreads), **Parameters** (size → params, FLOPs, GPU-hours).
-- [ ] **Phase 3:** **Verify**: each runbook check with a Run button (read-only commands) and your output
+- [x] **Phase 3:** **Verify**: each runbook check with a Run button (read-only commands) and your output
       next to the expected output.
 
 **Exit criteria**
-- [ ] Starting, stopping and checking the studio each take one command, and nothing it writes lands
+- [x] Starting, stopping and checking the studio each take one command, and nothing it writes lands
       in the repo.
-- [ ] Every number on every page comes from a file on disk, and a test proves it for each API.
+- [x] Every number on every page comes from a file on disk, and a test proves it for each API.
 - [ ] A project added in M3 appears in the switcher, with its runs, artifacts, models and runbook,
       without changing studio code. *(Rehearsed with `shakespeare_char`, which the studio was never
       written for: every page works.)*

@@ -523,6 +523,14 @@ responses back. A **422** response means the request body failed validation.
 (Web Server Gateway Interface) is synchronous, ASGI (Asynchronous Server Gateway Interface) its
 async successor. Uvicorn is an ASGI server; FastAPI is an ASGI app.
 
+**CSRF — Cross-Site Request Forgery.** A web page you visit making your browser send a request to
+another site, here to a server on your own machine. The studio's Run endpoint refuses any request that
+doesn't come from its own page.
+
+**CORS — Cross-Origin Resource Sharing.** The browser rule that decides whether a page from one
+origin may read responses from another. A request with a custom header triggers a "preflight" check
+first, and a server that never approves preflights (like the studio) blocks cross-origin requests.
+
 **ES module.** A JavaScript file that declares what it `export`s and is loaded with `import`, natively
 in every current browser. The playground loads a model's `viewer.js` this way.
 

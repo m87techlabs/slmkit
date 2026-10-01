@@ -8,8 +8,8 @@
 | Phase | Builds | Status |
 |---|---|---|
 | **1** | start/stop/status/run; **Your model**, **Lifecycle**, **Training**, **Playground** | ☑ |
-| **2** | **Learn** (rendered docs, glossary on hover), **Experiments**, **Parameters** | ☑ this page |
-| 3 | **Verify**: runbook checks with Run buttons | ☐ |
+| **2** | **Learn** (rendered docs, glossary on hover), **Experiments**, **Parameters** | ☑ |
+| **3** | **Verify**: runbook checks with Run buttons | ☑ this page |
 
 The studio is a local web app over what is on disk: `$SLM_HOME`'s artifacts, runs, eval reports and
 models, and the repo's roadmap and runbooks. It writes nothing except its own working set in
@@ -20,8 +20,8 @@ models, and the repo's roadmap and runbooks. It writes nothing except its own wo
 ## S.0 The checks
 
 ```bash
-make test                                         # 213 passed
-uv run pytest -q tests/unit/test_studio.py        # 18 passed
+make test                                         # 237 passed
+uv run pytest -q tests/unit/test_studio.py        # 42 passed
 ```
 
 The tests start the studio's app on the toy project and check that:
@@ -33,7 +33,10 @@ The tests start the studio's app on the toy project and check that:
 - a record left by a dead process is cleared;
 - (phase 2) the doc tree follows the concepts index's order, glossary entries parse into the names they
   match, search is case-insensitive, `.git` and paths outside the repo are refused, and size estimates
-  equal the trainer's own `parameters_from_args` and `flops_per_token`.
+  equal the trainer's own `parameters_from_args` and `flops_per_token`;
+- (phase 3) 22 commands are classified correctly as runnable or not (`test_only_read_only_commands_may_run`),
+  runbook blocks parse with their expected output, and a check runs only when the request comes from
+  the studio's own page.
 
 ---
 
@@ -244,6 +247,44 @@ pretrain abc_music/baseline` prints at startup.
 
 ---
 
+## S.10 Verify
+
+![slm studio: Verify, with a check run and compared](../images/studio-verify.png)
+
+Every runbook for the project, turned into checks: each ```` ```bash ```` block with its heading and
+the expected output that follows it. Pick a runbook from the cards (`#/verify?runbook=…`; `&check=<id>`
+jumps to one).
+
+- **Run** appears only on checks whose every command is read-only: inspecting runs, models, lineage and
+  configs; the test and lint suites; projects' `check_*.py` scripts; git and GPU status; reading files in
+  `$SLM_HOME` or the repo. The output streams in as it runs, then sits next to the runbook's expected
+  output, with the lines that match exactly in green ("14 of 14 expected lines appear exactly"). Run IDs,
+  dates and speeds always differ, and the runbook text says which numbers must match.
+- **Copy** appears on everything else, with the reason: it trains, evaluates, exports or writes ("run it
+  in your terminal"), or it uses shell syntax such as pipes, `&&` or an inline script.
+- **Run all N safe checks** goes through a runbook's runnable checks one after another.
+- Each check remembers its last result in `$SLM_HOME/studio/verify.json` ("passed · 1 minute ago ·
+  1.5s"), never in the repo.
+
+Measured on this repo: 105 checks across the four runbooks, 33 runnable from the browser.
+
+**Check the guard by hand** (with the studio running): a request that doesn't come from the studio's
+own page is refused, so another website can't make your browser run checks.
+
+```bash
+curl -s -X POST localhost:8765/api/verify/run -H 'content-type: application/json' -H 'x-slm-studio: 1' -H 'origin: https://evil.example' -d '{"runbook":"docs/runbooks/m2-abc-music.md","check_id":"000000000000"}'
+```
+```
+{"detail":"run requests are only accepted from the studio's own page"}
+```
+
+**Why so strict:** a Run button is a remote control for your terminal. The page can only name a check
+by ID; the command text comes from the committed runbook; it is matched against the list, checked again
+right before running, and executed without a shell. Anything that writes stays a command you run
+yourself, watching it (ADR 0009, phase 3).
+
+---
+
 ## Phase 1: done when
 
 - [x] `make test` (205) and `make lint` pass.
@@ -258,3 +299,12 @@ pretrain abc_music/baseline` prints at startup.
       annotated in sft.md; no scripts or event handlers in rendered HTML).
 - [x] Experiments and Parameters agree with `slm runs summary` and with the trainer's startup numbers.
 - [ ] **You** have run S.7–S.9 in your browser.
+
+## Phase 3: done when
+
+- [x] `make test` (237) and `make lint` pass.
+- [x] Verify lists every runbook check; the read-only ones run, stream their output and compare it with
+      the expected output; the rest show Copy and the reason.
+- [x] A cross-origin or header-less run request is refused (403), a write command is refused even by ID
+      (403), and results persist outside the repo.
+- [ ] **You** have run S.10 in your browser, including "Run all" on one runbook.

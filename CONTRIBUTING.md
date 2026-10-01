@@ -54,6 +54,11 @@ able to follow it without prior ML knowledge.
   *what* it is, *how* it was done, *how to verify it by hand* (commands plus real expected
   output captured by running them), and *why* it was done that way, including what was
   rejected. Update it whenever a verification step changes.
+- **Runbook checks are machine-readable.** Put commands in a ```` ```bash ```` block and their real
+  output in a plain ```` ``` ```` block right after it. A runbook that belongs to one project says so
+  near its top with `<!-- slm-studio: projects=<name> -->`. `slm studio`'s Verify page turns each
+  block into a check, and read-only ones get a Run button. A project's read-only analysis scripts are
+  named `projects/<name>/check_*.py`, which is what lets them run there.
 - **Figures are generated, never hand-drawn.** Charts in `docs/images/` come from
   `scripts/make_figures.py` (`make figures`) reading real runs; diagrams are Mermaid in the Markdown.
   Regenerate figures when the runs they show change.

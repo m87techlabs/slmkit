@@ -50,6 +50,27 @@ play with the models, and later check each runbook step. The constraints:
    GPU time. Writing it found that `flops_per_token` counted an untied output head twice. No preset unties
    it, so no reported number changed.
 
+### Phase 3 additions
+
+10. **Verify** turns each runbook into checks: a ```` ```bash ```` block, its heading, and the expected
+    output in the plain block that follows. A check may run from the browser only if every command is
+    on a short, literal list of read-only commands (`studio/verify.py: classify`):
+    - inspecting runs, models, lineage and configs, and sampling;
+    - the test and lint suites, in check mode;
+    - projects' `check_*.py` analysis scripts;
+    - git and GPU status;
+    - file reads inside `$SLM_HOME` and the repo.
+
+    Anything that trains, evaluates, exports, serves, writes or uses shell syntax gets a Copy button and
+    the reason. Three barriers keep it that way:
+    - the browser names a check **by ID**, so the command text always comes from the committed runbook;
+    - commands are split into arguments, checked again just before running, and executed without a shell;
+    - the endpoint requires a custom header and a same-origin `Origin`, so another website can't use
+      the visitor's browser to trigger runs (CSRF).
+
+    One check runs at a time, each command for at most ten minutes (CONTRIBUTING.md rule 9). Last
+    results are kept in `$SLM_HOME/studio/verify.json`.
+
 ## Consequences
 
 - Every number on every page traces to a file, so the studio can't disagree with the pipeline. Tests
@@ -75,3 +96,9 @@ play with the models, and later check each runbook step. The constraints:
   integrity guarantee.
 - **Server-sent events or WebSockets for live readings.** Rejected for now: polling every 2 s is one
   line of code and cheap. Push can replace it if phase 3 streams command output.
+- **Run any runbook command, with a confirmation dialog.** Rejected: a dialog is the only barrier
+  between a click and `slm pretrain` or a deletion, and runbook commands that write belong in a terminal
+  the person is watching.
+- **A shell (`bash -c`) for running checks.** Rejected: it would make pipes, redirections and `$(…)`
+  run, which the allowlist can't reason about. Splitting into arguments and refusing shell syntax keeps
+  "what runs" equal to "what was checked".
