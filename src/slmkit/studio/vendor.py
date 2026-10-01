@@ -34,6 +34,27 @@ FILES = (
         "MIT",
     ),
     VendorFile(
+        "marked.umd.js",
+        "https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js",
+        "2vpGtuKqJvFlwJqYnf/wUMuzUfhUnYBt9oay0e2yaFcq0Dh6/aEbQ8YAOeKGzlYo",
+        "marked 18.0.14",
+        "MIT",
+    ),
+    VendorFile(
+        "purify.min.js",
+        "https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js",
+        "a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL",
+        "DOMPurify 3.4.16",
+        "Apache-2.0 or MPL-2.0",
+    ),
+    VendorFile(
+        "mermaid.min.js",
+        "https://cdn.jsdelivr.net/npm/mermaid@12.0.0/dist/mermaid.min.js",
+        "xzghz1GQ5u9HCpVskeDPqMsdogD1yvuMQbEK53+wi+G70+6J1AG0L2cfi9PHjDWI",
+        "Mermaid 12.0.0",
+        "MIT",
+    ),
+    VendorFile(
         "uPlot.min.css",
         "https://cdn.jsdelivr.net/npm/uplot@1.6.32/dist/uPlot.min.css",
         "IfV0B7MIOYuO95kO9G5ySKPz/85zqFNOAs8iy4tkK5zd9izhJAB8b7lHrwYqqmYE",

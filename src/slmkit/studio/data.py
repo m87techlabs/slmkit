@@ -96,14 +96,13 @@ def _vocab_size(tokenizer_dir: str) -> int:
     return load_tokenizer(Path(tokenizer_dir)).vocab_size
 
 
-def _params(run: Artifact, arts: dict[str, Artifact]) -> int | None:
-    """Parameter count from the run's resolved config and its tokenizer, without loading weights."""
+def _args(run: Artifact, arts: dict[str, Artifact]) -> ModelArgs | None:
+    """The run's architecture from its resolved config and its tokenizer, without loading weights."""
     try:
         cfg = yaml.safe_load((run.path / "config.resolved.yaml").read_text())
         tok = arts[run.manifest["inputs"]["tokenizer"]]
-        args = ModelArgs.from_config(ModelConfig.model_validate(cfg["model"]),
+        return ModelArgs.from_config(ModelConfig.model_validate(cfg["model"]),
                                      _vocab_size(str(tok.path)), cfg["data"]["block_size"])  # fmt: skip
-        return parameters_from_args(args)
     except (OSError, KeyError, ValueError):
         return None
 
@@ -230,6 +229,7 @@ def _run_row(run: Artifact, arts: dict[str, Artifact]) -> dict[str, Any]:
     kind = "sft" if stage == "sft" else "headers"
     latest = next((r for r in reversed(reports) if r.get("prompts_kind", "headers") == kind), None)
     cfg = run.manifest.get("config", {})
+    args = _args(run, arts)
     return {
         "run_id": run.id,
         "experiment": st.get("experiment") or run.manifest.get("stats", {}).get("experiment"),
@@ -238,7 +238,9 @@ def _run_row(run: Artifact, arts: dict[str, Artifact]) -> dict[str, Any]:
         "seed": cfg.get("run", {}).get("seed"),
         "preset": cfg.get("model", {}).get("preset"),
         "tokenizer": cfg.get("tokenizer", {}).get("type"),
-        "params": _params(run, arts),
+        "params": parameters_from_args(args) if args else None,
+        "vocab_size": args.vocab_size if args else None,
+        "block_size": args.block_size if args else None,
         "complete": bool(st.get("complete")),
         "tokens_seen": st.get("tokens_seen", 0),
         "max_tokens": st.get("max_tokens"),
@@ -430,3 +432,27 @@ def overview(repo: Path, home: Path, project: str) -> dict[str, Any]:
         "milestones": milestones(repo),
         "runbooks": runbooks(repo, project),
     }
+
+
+# ------------------------------------------------------------------------------ experiments
+
+
+def experiments(home: Path, project: str, prompts: str = "auto") -> list[dict[str, Any]]:
+    """`slm runs summary`'s groups for one project, with every run's own values and its sampling
+    spread (the ± of its eval report), so the page can show both kinds of noise side by side."""
+    from slmkit.eval.runner import latest_report
+    from slmkit.eval.summary import summarize
+
+    out = []
+    for g in summarize(prompts, project):
+        runs: list[dict[str, Any]] = []
+        for rid, seed, values in zip(g.run_ids, g.seeds, g.per_run, strict=True):
+            report = latest_report(home / "runs" / rid, g.eval_kind) if g.eval_kind else None
+            spread = (
+                {m: s["std"] for m, s in report["model"]["aggregate"].items()} if report else {}
+            )
+            runs.append({"run_id": rid, "seed": seed, "values": values, "sampling_std": spread})
+        out.append({"experiment": g.experiment, "stage": g.stage, "eval_kind": g.eval_kind,
+                    "gpu_hours": round(g.gpu_hours, 4), "stats": g.stats,
+                    "runs": sorted(runs, key=lambda r: int(r["seed"]))})  # fmt: skip
+    return out

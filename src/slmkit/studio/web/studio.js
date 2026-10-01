@@ -11,7 +11,10 @@ const PAGES = [
   { id: "home", title: "Your model", module: "./pages/home.js" },
   { id: "lifecycle", title: "Lifecycle", module: "./pages/lifecycle.js" },
   { id: "training", title: "Training", module: "./pages/training.js" },
+  { id: "experiments", title: "Experiments", module: "./pages/experiments.js" },
+  { id: "parameters", title: "Parameters", module: "./pages/parameters.js" },
   { id: "playground", title: "Playground", module: "./pages/playground.js" },
+  { id: "learn", title: "Learn", module: "./pages/learn.js" },
 ];
 
 const root = document.getElementById("page");

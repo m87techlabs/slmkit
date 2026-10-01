@@ -13,7 +13,12 @@ from fastapi.testclient import TestClient
 
 from slmkit.export.hf import export_run
 from slmkit.model import CausalLM, ModelArgs
-from slmkit.model.stats import count_parameters, parameters_from_args
+from slmkit.model.stats import (
+    count_parameters,
+    flops_per_token,
+    flops_per_token_from_args,
+    parameters_from_args,
+)
 from slmkit.studio import machine, process, vendor
 from slmkit.studio.app import create_app
 
@@ -132,3 +137,108 @@ def test_parameter_count_from_the_architecture_alone(kv: int) -> None:
                      n_kv_heads=kv, ffn_hidden=352, tie_embeddings=kv == 4)  # fmt: skip
     assert parameters_from_args(args) == count_parameters(CausalLM(args)).total
     torch.manual_seed(0)
+
+
+# ------------------------------------------------------------------------------ phase 2
+
+GLOSSARY = textwrap.dedent("""\
+    # Glossary
+
+    ## The big picture
+
+    **LLM — Large Language Model.** A network that predicts the next token.
+
+    **Top-k / top-p (nucleus).** Restrict sampling to likely tokens.
+
+    **Base model vs fine-tuned model.** A comparison, not a term to match.
+    """)
+
+
+@pytest.fixture
+def docs_repo(studio: TestClient, toy_repo: Path) -> TestClient:
+    concepts = toy_repo / "docs" / "concepts"
+    concepts.mkdir()
+    (concepts / "README.md").write_text("| [`b.md`](b.md) | M1 |\n| [`a.md`](a.md) | M2 |\n")
+    (concepts / "a.md").write_text("# Concept A\n\nAn LLM reads tokens.\n")
+    (concepts / "b.md").write_text("# Concept B\n\n## Sampling\n\nuse top-k here\n")
+    (toy_repo / "docs" / "GLOSSARY.md").write_text(GLOSSARY)
+    (toy_repo / "docs" / "LIFECYCLE.md").write_text("# The lifecycle\n")
+    return studio
+
+
+def test_doc_tree_follows_reading_order(docs_repo: TestClient) -> None:
+    tree = {
+        s["title"]: [d["path"] for d in s["docs"]]
+        for s in docs_repo.get("/api/docs?project=toy").json()
+    }
+    assert tree["Start here"] == ["docs/LIFECYCLE.md"]
+    assert tree["Concepts"] == ["docs/concepts/b.md", "docs/concepts/a.md"]  # the index's order
+    assert (
+        "docs/runbooks/m2-toy.md" in tree["Runbooks"]
+        and "docs/runbooks/m3-other.md" not in tree["Runbooks"]
+    )
+
+
+def test_glossary_entries_and_their_names(docs_repo: TestClient) -> None:
+    entries = {e["term"]: e for e in docs_repo.get("/api/glossary").json()}
+    assert entries["LLM — Large Language Model"]["names"] == ["LLM", "Large Language Model"]
+    assert entries["Top-k / top-p (nucleus)"]["names"] == ["Top-k", "top-p", "nucleus"]
+    assert entries["Base model vs fine-tuned model"]["names"] == []  # comparisons aren't matched
+    assert entries["LLM — Large Language Model"]["section"] == "The big picture"
+
+
+def test_search_finds_lines_with_their_heading(docs_repo: TestClient) -> None:
+    hits = docs_repo.get("/api/search?q=TOP-K&project=toy").json()  # case-insensitive
+    assert {"path": "docs/concepts/b.md", "heading": "Sampling"} in [
+        {"path": h["path"], "heading": h["heading"]} for h in hits
+    ]
+    assert any(h["path"] == "docs/GLOSSARY.md" for h in hits)
+
+
+def test_source_and_images_stay_inside_the_readable_repo(
+    docs_repo: TestClient, toy_repo: Path
+) -> None:
+    (toy_repo / ".git").mkdir(exist_ok=True)
+    (toy_repo / ".git" / "config").write_text("secret")
+    (toy_repo / "docs" / "images").mkdir()
+    (toy_repo / "docs" / "images" / "x.png").write_bytes(b"\x89PNG")
+    assert docs_repo.get("/api/source?path=projects/toy/project.py").status_code == 200
+    for bad in (".git/config", "../outside.txt", "docs/images/x.png", "/etc/passwd"):
+        assert docs_repo.get(f"/api/source?path={bad}").status_code == 404, bad
+    assert docs_repo.get("/api/image?path=docs/images/x.png").headers["content-type"] == "image/png"
+    assert docs_repo.get("/api/image?path=docs/LIFECYCLE.md").status_code == 404
+
+
+def test_experiments_group_runs_over_seeds(studio: TestClient, toy_run: str) -> None:
+    (g,) = [
+        g for g in studio.get("/api/experiments?project=toy").json() if g["stage"] == "pretrain"
+    ]
+    assert g["experiment"] == "toy/base" and [r["run_id"] for r in g["runs"]] == [toy_run]
+    assert "best val loss" in g["stats"]
+
+
+def test_estimate_uses_the_trainers_formulas(studio: TestClient) -> None:
+    shape = {"n_layers": 4, "d_model": 128, "n_heads": 4, "n_kv_heads": 4, "ffn_hidden": 384,
+             "vocab_size": 87, "block_size": 512, "tie_embeddings": True, "tokens": 30_000_000}  # fmt: skip
+    e = studio.post("/api/estimate", json=shape).json()
+    args = ModelArgs(**{k: v for k, v in shape.items() if k != "tokens"})
+    assert e["params"]["total"] == parameters_from_args(args) == 864_256
+    assert e["flops_per_token"] == flops_per_token(CausalLM(args))
+    assert e["training_flops"] == e["flops_per_token"] * 30_000_000
+    bad = studio.post("/api/estimate", json={**shape, "n_heads": 3})
+    assert bad.status_code == 422 and "n_heads" in bad.json()["detail"]
+    names = [p["name"] for p in studio.get("/api/presets").json()]
+    assert {"nano", "micro", "ref"} <= set(names)
+
+
+@pytest.mark.parametrize("tie", [True, False])
+def test_flops_from_the_architecture_match_the_model(tie: bool) -> None:
+    args = ModelArgs(vocab_size=87, block_size=64, n_layers=2, d_model=64, n_heads=4, n_kv_heads=2,
+                     ffn_hidden=176, tie_embeddings=tie)  # fmt: skip
+    model = CausalLM(args)
+    assert flops_per_token(model) == flops_per_token_from_args(args)
+    # The output head is one matmul whether or not it shares the embedding's weights.
+    matmul = count_parameters(model).total - args.vocab_size * args.d_model * (1 if tie else 2)
+    assert (
+        flops_per_token(model) == 6 * (matmul + args.vocab_size * args.d_model) + 12 * 2 * 64 * 64
+    )

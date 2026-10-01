@@ -70,9 +70,17 @@ def flops_per_token(model: CausalLM, seq_len: int | None = None) -> int:
     itself is free. Attention adds 12 * n_layers * d_model * seq_len on top (scores and the
     weighted sum, which grow with context length), the same estimate nanoGPT uses for MFU.
     """
-    args = model.args
+    return flops_per_token_from_args(model.args, seq_len)
+
+
+def flops_per_token_from_args(args: ModelArgs, seq_len: int | None = None) -> int:
+    """`flops_per_token` from the architecture alone. The matmul parameters are everything but
+    the embedding lookup, plus the output head once: inside the non-embedding count when it has
+    its own weights, added here when it shares the embedding's."""
     t = seq_len or args.block_size
-    matmul_params = count_parameters(model).non_embedding + args.vocab_size * args.d_model
+    head = args.vocab_size * args.d_model
+    non_embedding = parameters_from_args(args) - head  # the embedding table is the first V x D
+    matmul_params = non_embedding + (head if args.tie_embeddings else 0)
     return 6 * matmul_params + 12 * args.n_layers * args.d_model * t
 
 

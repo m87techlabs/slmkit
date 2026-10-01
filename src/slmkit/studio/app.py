@@ -22,13 +22,15 @@ import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from slmkit import artifacts
 from slmkit.config.load import ConfigError, repo_root
 from slmkit.export.hf import load_export
+from slmkit.model import ModelArgs
 from slmkit.registry import ProjectNotFound, load_project
 from slmkit.serve.app import PAGE, GenerateRequest, GenerateResponse, ModelServer
-from slmkit.studio import data, machine
+from slmkit.studio import data, learn, machine, sizing
 
 WEB = Path(__file__).parent / "web"
 KEEP_MODELS = 2
@@ -48,6 +50,20 @@ def fallback_viewer(model_path: Path, manifest: dict[str, Any]) -> Path | None:
     except (KeyError, ConfigError, ProjectNotFound):
         return None
     return web if web is not None and (web / "viewer.js").is_file() else None
+
+
+class SizeQuery(BaseModel):
+    """A model shape for the Parameters page. Bounds keep the arithmetic meaningful, not small."""
+
+    n_layers: int = Field(ge=1, le=256)
+    d_model: int = Field(ge=8, le=32768)
+    n_heads: int = Field(ge=1, le=512)
+    n_kv_heads: int = Field(ge=1, le=512)
+    ffn_hidden: int = Field(ge=8, le=262144)
+    vocab_size: int = Field(ge=2, le=1_000_000)
+    block_size: int = Field(ge=8, le=1_000_000)
+    tie_embeddings: bool = True
+    tokens: int = Field(ge=1, le=10**15)
 
 
 class Models:
@@ -145,9 +161,56 @@ def create_app(home: Path | None = None, repo: Path | None = None) -> FastAPI:
     @app.get("/api/doc", response_class=PlainTextResponse)
     def doc(path: str) -> str:
         try:
-            return data.read_doc(repo, path)
+            return (
+                data.read_doc(repo, path)
+                if path != "README.md"
+                else (repo / "README.md").read_text()
+            )
         except FileNotFoundError:
             raise HTTPException(404, f"no document {path}") from None
+
+    @app.get("/api/experiments")
+    def experiments(project: str, prompts: str = "auto") -> list[dict[str, Any]]:
+        return data.experiments(home, project, prompts)
+
+    @app.get("/api/presets")
+    def presets() -> list[dict[str, Any]]:
+        return sizing.presets(repo)
+
+    @app.post("/api/estimate")
+    def estimate(q: SizeQuery) -> dict[str, Any]:
+        args = ModelArgs(**q.model_dump(exclude={"tokens"}))
+        try:
+            return sizing.estimate(home, args, q.tokens)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.get("/api/docs")
+    def docs(project: str | None = None) -> list[dict[str, Any]]:
+        return learn.doc_tree(repo, project)
+
+    @app.get("/api/glossary")
+    def glossary() -> list[dict[str, Any]]:
+        return learn.glossary(repo)
+
+    @app.get("/api/search")
+    def search(q: str, project: str | None = None) -> list[dict[str, Any]]:
+        return learn.search(repo, q, project)
+
+    @app.get("/api/source", response_class=PlainTextResponse)
+    def source(path: str) -> str:
+        try:
+            return learn.source(repo, path)
+        except FileNotFoundError:
+            raise HTTPException(404, f"not readable: {path}") from None
+
+    @app.get("/api/image")
+    def image(path: str) -> FileResponse:
+        try:
+            file, media = learn.image(repo, path)
+        except FileNotFoundError:
+            raise HTTPException(404, f"no image {path}") from None
+        return FileResponse(file, media_type=media)
 
     # ---------------------------------------------------------------- playgrounds
 

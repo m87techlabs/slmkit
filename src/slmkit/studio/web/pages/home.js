@@ -1,7 +1,7 @@
 // Your model: what you built on this PC, the machine it ran on (with live readings), the journey
 // so far, and where to read more.
 
-import { api, fmt, h, showDoc, sparkline, tile } from "../lib/ui.js";
+import { api, fmt, h, sparkline, tile } from "../lib/ui.js";
 
 const LIVE_EVERY_MS = 2000;
 const HISTORY = 60; // two minutes of readings
@@ -97,14 +97,11 @@ export async function render({ project, root, navigate }) {
       : h("p", { class: "muted" }, "No runs yet."));
 
   const books = h("section", { class: "panel" }, h("h2", {}, "Runbooks for this project"),
-    h("p", { class: "muted small" }, "What was built, how to check it by hand, and why. Rendered pages and Run buttons come in studio phases 2 and 3."),
+    h("p", { class: "muted small" }, "What was built, how to check it by hand, and why. They open in Learn; Run buttons come in studio phase 3."),
     h("ul", { class: "journey" }, o.runbooks.map((b) => h("li", {},
       h("span", { class: "status" }, (b.status || "").slice(0, 1)),
-      h("span", {}, h("a", { href: "#", onclick: async (e) => {
-        e.preventDefault();
-        const text = await (await fetch(`/api/doc?path=${encodeURIComponent(b.file)}`)).text();
-        showDoc(b.title, text);
-      } }, b.title), h("span", { class: "muted small" }, ` · ${b.milestone}${b.projects ? "" : " · engine"}`))))));
+      h("span", {}, h("a", { href: `#/learn?project=${encodeURIComponent(project)}&doc=${encodeURIComponent(b.file)}` }, b.title),
+        h("span", { class: "muted small" }, ` · ${b.milestone}${b.projects ? "" : " · engine"}`))))));
 
   const everywhere = o.all_projects;
   const all = h("p", { class: "muted small" },
@@ -116,7 +113,10 @@ export async function render({ project, root, navigate }) {
       h("h2", {}, "How to read this studio"),
       h("ul", {}, h("li", {}, h("strong", {}, "Lifecycle"), ": every artifact your pipeline made, and what fed what."),
         h("li", {}, h("strong", {}, "Training"), ": loss curves, what each model wrote as it learned, and its config."),
-        h("li", {}, h("strong", {}, "Playground"), ": ask an exported model for something, and see (and hear) it.")),
+        h("li", {}, h("strong", {}, "Experiments"), ": every configuration over its training seeds, and which differences are real."),
+        h("li", {}, h("strong", {}, "Parameters"), ": from a model's shape to its size, cost and memory, against what this GPU measured."),
+        h("li", {}, h("strong", {}, "Playground"), ": ask an exported model for something, and see (and hear) it."),
+        h("li", {}, h("strong", {}, "Learn"), ": every concept, runbook and decision, with the glossary on hover.")),
       all)));
   return () => clearInterval(timer);
 }
