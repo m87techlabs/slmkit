@@ -546,6 +546,24 @@ the prose, so a change to a diagram shows up in a diff and review like any other
 install for the build. Rejected: exported PNGs from a drawing tool, which can't be diffed or edited
 without the original tool.
 
+In `slm studio`'s Learn page the same diagrams are drawn by Mermaid's JavaScript library (`12.0.0`, MIT),
+downloaded once into `$SLM_HOME/studio/vendor/` with a pinned hash and loaded only on pages that have a
+diagram (it is 5.5 MB).
+
+### marked and DOMPurify
+**●** (slm studio, Learn) · marked `18.0.14` (MIT) · DOMPurify `3.4.16` (Apache-2.0 or MPL-2.0) ·
+[marked](https://marked.js.org/) · [DOMPurify](https://github.com/cure53/DOMPurify)
+
+**What they are.** marked turns Markdown into HTML in the browser; DOMPurify removes anything from HTML
+that could run code (scripts, event handlers, `javascript:` links).
+
+**Why.** The studio's Learn page renders the repo's docs as they are committed, with GitHub-flavoured
+tables. The docs are trusted, but rendering Markdown to HTML and inserting it is exactly where script
+injection happens, so the HTML is sanitized anyway: one line, and no reasoning about trust needed.
+Both are downloaded once into `$SLM_HOME/studio/vendor/`, verified by hash (ADR 0009). Rejected:
+rendering Markdown on the server (a new Python dependency, and Mermaid needs the browser anyway), and
+showing raw Markdown (tables and diagrams are much of the content).
+
 ---
 
 ## 12. References (read, not installed)

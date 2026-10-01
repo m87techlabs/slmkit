@@ -35,6 +35,21 @@ play with the models, and later check each runbook step. The constraints:
 6. **`slm studio start | stop | status | run`.** A background process with its record and log in
    `$SLM_HOME/studio/`, plus a foreground variant. It binds 127.0.0.1 only.
 
+### Phase 2 additions
+
+7. **Learn** renders the repo's Markdown in the browser (marked, then DOMPurify) and draws Mermaid diagrams
+   one at a time; rendering a page's diagrams as a batch put one diagram's nodes in another's box. Links
+   between docs stay in the studio. Images and linked source files are served read-only from the repo's
+   documentation and code directories, never `.git`, `.venv` or anything outside. Glossary terms are
+   parsed from `GLOSSARY.md`, and their first use in each document carries its definition on hover.
+8. **Experiments** reuses `slm runs summary`'s grouping and adds each run's sampling spread, so both
+   kinds of noise sit side by side. "Clear" marks a difference of at least twice the combined spread.
+9. **Parameters** computes size, FLOPs and memory with the trainer's own functions
+   (`parameters_from_args`, `flops_per_token_from_args`, now the single implementation). Next to the
+   estimates it shows what runs of the same shape measured, as training-step throughput and as whole-run
+   GPU time. Writing it found that `flops_per_token` counted an untied output head twice. No preset unties
+   it, so no reported number changed.
+
 ## Consequences
 
 - Every number on every page traces to a file, so the studio can't disagree with the pipeline. Tests

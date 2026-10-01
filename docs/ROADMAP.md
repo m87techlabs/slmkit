@@ -133,7 +133,7 @@ buttons execute read-only commands from a fixed list only. *~3–4 sessions, no 
       the machine, live GPU/CPU stats), **Lifecycle** (the pipeline as your real artifacts, with
       lineage), **Training** (loss curves, samples at every eval, configs), **Playground** (any
       exported model). ADR 0009, `runbooks/studio.md`, a "See it in slm studio" section per project runbook.
-- [ ] **Phase 2:** **Learn** (concepts, ADRs and runbooks rendered, diagrams, glossary on hover),
+- [x] **Phase 2:** **Learn** (concepts, ADRs and runbooks rendered, diagrams, glossary on hover),
       **Experiments** (sweeps, seeds, spreads), **Parameters** (size → params, FLOPs, GPU-hours).
 - [ ] **Phase 3:** **Verify**: each runbook check with a Run button (read-only commands) and your output
       next to the expected output.

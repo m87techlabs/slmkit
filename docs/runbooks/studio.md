@@ -7,8 +7,8 @@
 
 | Phase | Builds | Status |
 |---|---|---|
-| **1** | start/stop/status/run; **Your model**, **Lifecycle**, **Training**, **Playground** | ☑ this page |
-| 2 | **Learn** (rendered docs, glossary on hover), **Experiments**, **Parameters** | ☐ |
+| **1** | start/stop/status/run; **Your model**, **Lifecycle**, **Training**, **Playground** | ☑ |
+| **2** | **Learn** (rendered docs, glossary on hover), **Experiments**, **Parameters** | ☑ this page |
 | 3 | **Verify**: runbook checks with Run buttons | ☐ |
 
 The studio is a local web app over what is on disk: `$SLM_HOME`'s artifacts, runs, eval reports and
@@ -20,8 +20,8 @@ models, and the repo's roadmap and runbooks. It writes nothing except its own wo
 ## S.0 The checks
 
 ```bash
-make test                                         # 205 passed
-uv run pytest -q tests/unit/test_studio.py        # 10 passed
+make test                                         # 213 passed
+uv run pytest -q tests/unit/test_studio.py        # 18 passed
 ```
 
 The tests start the studio's app on the toy project and check that:
@@ -30,7 +30,10 @@ The tests start the studio's app on the toy project and check that:
 - documents outside `docs/` are refused;
 - the playground is `slm serve`'s under a prefix, and path tricks (`ui/../manifest.json`) are refused;
 - a tampered library download is rejected;
-- a record left by a dead process is cleared.
+- a record left by a dead process is cleared;
+- (phase 2) the doc tree follows the concepts index's order, glossary entries parse into the names they
+  match, search is case-insensitive, `.git` and paths outside the repo are refused, and size estimates
+  equal the trainer's own `parameters_from_args` and `flops_per_token`.
 
 ---
 
@@ -48,7 +51,8 @@ slm studio is running: http://localhost:8765/  pid 58620, since 2026-09-30T14:47
   log: /home/you/slm/studio/studio.log
 ```
 
-The two `vendor:` lines appear on the first start only: the chart library is downloaded once,
+The `vendor:` lines appear on the first start only (and once more for each library a later phase adds:
+marked, DOMPurify and Mermaid arrived with phase 2): the chart library is downloaded once,
 checked against its pinned SHA-384 hash, and kept. After that the studio works offline (the
 Playground's sheet music still loads abcjs from its CDN, E.6).
 
@@ -175,9 +179,82 @@ the studio was never written for: its runs, its lineage, curves that overfit (th
 
 ---
 
+## S.7 Learn
+
+![slm studio: Learn, showing concepts/sft.md](../images/studio-learn.png)
+
+Every document in the repo, in reading order: start here, concepts (in the order milestones produced
+them), this project's README, its runbooks, the reference docs and the ADRs. Each is rendered as
+committed (`#/learn?doc=docs/concepts/sft.md`):
+
+- **Links between documents stay in the studio**; links to source files open them in a viewer; images
+  (the figures, the training GIF) are served from the repo.
+- **Diagrams** (Mermaid, e.g. in The model development lifecycle) are drawn.
+- **Glossary terms are underlined on first use.** Hover or focus one for its definition, with a link to
+  the glossary entry. They are parsed from `GLOSSARY.md` (177 entries), so a new term there appears
+  everywhere with no other change.
+- **Search** (top left) looks through every document, case-insensitively, and links to the section.
+
+**Check by hand:** open "Supervised fine-tuning", hover the dotted "header dropout", and compare the text
+with the glossary's entry.
+
+---
+
+## S.8 Experiments
+
+![slm studio: Experiments](../images/studio-experiments.png)
+
+`slm runs summary` as a picture, with a verdict:
+
+- **The dot plot:** each experiment's training seeds as dots, the mean as a diamond, ± one spread as a
+  pale bar, the reference experiment's mean as a dashed line. Click a dot to open that run.
+- **The table:** every metric as mean ± spread, and against the reference either **clear** (the means
+  are at least 2× the typical spread apart) or **≈ noise**. Pick another reference: compare
+  `micro_noaug` with `micro` and see transposition's effect turn out to be noise on bits per character.
+- **Two kinds of noise:** for a grader metric, the sampling spread (one model, re-sampled: `slm eval`'s
+  ±) next to the training spread (re-trained with another seed). The second is the larger, which is why
+  Phase C's single-seed tokenizer gap didn't survive (experiments.md §3).
+
+**Check by hand:** the means and spreads equal `uv run slm runs summary --project abc_music`.
+
+---
+
+## S.9 Parameters
+
+![slm studio: Parameters](../images/studio-parameters.png)
+
+Pick a preset or set the shape by hand (layers, width, heads, key/value heads, MLP width, vocabulary,
+context) and a token budget, and see:
+
+- **parameters**, split into embedding, attention, MLP and norms;
+- **FLOPs per token** and **training FLOPs**;
+- **memory and files**: fp32 weights, training state (weights, gradients and AdamW's averages, 16 bytes
+  per parameter), checkpoint and export sizes;
+- **what this GPU measured** for runs of exactly that shape: tokens per second, achieved TFLOPS and MFU
+  against the `slm doctor --bench` peak, and the budget's GPU time as training steps alone and as whole
+  runs (with evaluations and compilation). `micro`: 1.40M tokens/s, 54 TFLOPS, 48% MFU, and 37
+  GPU-seconds for 30M tokens against 21 for the steps alone and 27 planned.
+
+The arithmetic is the trainer's own (`parameters_from_args`, `flops_per_token_from_args`), on the
+server; the page only displays it. An impossible shape (8 heads that don't divide the width) gets a
+plain explanation instead of numbers.
+
+**Check by hand:** the nano preset with vocabulary 87 shows 864,256 parameters, the number `slm
+pretrain abc_music/baseline` prints at startup.
+
+---
+
 ## Phase 1: done when
 
 - [x] `make test` (205) and `make lint` pass.
 - [x] `slm studio start | stop | status | run` work; nothing is written to the repo.
 - [x] Your model, Lifecycle, Training and Playground render for `abc_music` and `shakespeare_char`.
 - [ ] **You** have run S.1–S.6 in your browser.
+
+## Phase 2: done when
+
+- [x] `make test` (213) and `make lint` pass.
+- [x] Learn renders every doc with diagrams, in-studio links, images and glossary hovers (30 terms
+      annotated in sft.md; no scripts or event handlers in rendered HTML).
+- [x] Experiments and Parameters agree with `slm runs summary` and with the trainer's startup numbers.
+- [ ] **You** have run S.7–S.9 in your browser.
