@@ -97,7 +97,9 @@ def ensure_vendor(log: Log) -> None:
         log("  (the studio works without them; charts show a notice instead)")
 
 
-def start(port: int = DEFAULT_PORT, *, open_: bool = True, log: Log = print) -> dict[str, Any]:
+def start(
+    port: int = DEFAULT_PORT, *, open_: bool = True, device: str = "auto", log: Log = print
+) -> dict[str, Any]:
     running = status()
     if running:
         log(f"already running: {running['url']} (pid {running['pid']})")
@@ -110,7 +112,7 @@ def start(port: int = DEFAULT_PORT, *, open_: bool = True, log: Log = print) -> 
         )
         out.flush()
         proc = subprocess.Popen(
-            [sys.executable, "-m", "slmkit.studio", "--port", str(port)],
+            [sys.executable, "-m", "slmkit.studio", "--port", str(port), "--device", device],
             stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             start_new_session=True,  # survives the terminal closing; `slm studio stop` ends it
         )  # fmt: skip

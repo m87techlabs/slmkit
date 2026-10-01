@@ -28,7 +28,8 @@ export async function render({ project, params, root }) {
         : m.viewer ? null : h("div", { class: "small muted" }, "No viewer: raw text only."))));
     frame.src = `/play/${encodeURIComponent(current.name)}/${current.version}/`;
   }
-  root.append(h("p", { class: "lede" }, "Each card is an exported model: the same files `slm serve` would serve. Generation runs on the CPU here, so it doesn't compete with training."),
+  root.append(h("p", { class: "lede" }, "Each card is an exported model: the same files `slm serve` would serve. Here it runs on the GPU if there is one "
+    + "(`slm studio start --device cpu` keeps it off); a few seconds of generation barely disturbs a training run."),
     cards, frame);
   draw();
 }

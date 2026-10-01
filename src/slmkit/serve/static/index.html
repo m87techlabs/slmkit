@@ -55,6 +55,8 @@
   #ask textarea { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px;
              min-height: 110px; resize: vertical; }
   #ask input[type=range] { padding: 0; }
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+  .examples button { font-size: 13px; padding: 3px 10px; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
   button { font: inherit; border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
@@ -90,6 +92,7 @@
       <label for="prompt">Prompt, exactly as the model sees it</label>
       <textarea id="prompt" spellcheck="false"></textarea>
       <div class="hint" id="prompt-hint"></div>
+      <div id="examples" class="examples" aria-label="Example prompts"></div>
       <div class="row">
         <div>
           <label for="temperature">Temperature <span id="temperature-value"></span></label>
@@ -133,7 +136,13 @@ async function start() {
     ` · ${info.params.toLocaleString()} parameters · ${info.context_tokens}-token context · ${info.device}`;
   document.title = `${info.model} · slmkit`;
   $("prompt").value = info.example_prompt;
-  $("prompt-hint").textContent = "Example from the model card. The trailing newline matters.";
+  $("prompt-hint").textContent = "Type anything, or start from an example. The trailing newline matters.";
+  $("examples").replaceChildren(text("span", "Try:", "hint"), ...info.examples.map((ex) => {
+    const b = text("button", ex.id);
+    b.title = ex.prompt;
+    b.addEventListener("click", () => { $("prompt").value = ex.prompt; $("prompt").focus(); });
+    return b;
+  }));
   $("temperature").value = info.defaults.temperature;
   $("max-tokens").value = info.defaults.max_new_tokens;
   const params = new URLSearchParams(location.search);

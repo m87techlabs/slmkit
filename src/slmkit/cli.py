@@ -678,12 +678,15 @@ STUDIO_PORT = typer.Option(8765, help="Local port for the studio.")
 def studio_start(
     port: int = STUDIO_PORT,
     open_: bool = typer.Option(True, "--open/--no-open", help="Open it in your browser."),
+    device: str = typer.Option(
+        "auto", help="Where playground models run: auto (GPU if any), cuda, cpu."
+    ),
 ) -> None:
     """Start the studio in the background and open it in the browser."""
     from slmkit.studio import process
 
     try:
-        process.start(port, open_=open_, log=typer.echo)
+        process.start(port, open_=open_, device=device, log=typer.echo)
     except RuntimeError as exc:
         typer.secho(f"error: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
@@ -715,7 +718,12 @@ def studio_status() -> None:
 
 
 @studio_app.command("run")
-def studio_run(port: int = STUDIO_PORT) -> None:
+def studio_run(
+    port: int = STUDIO_PORT,
+    device: str = typer.Option(
+        "auto", help="Where playground models run: auto (GPU if any), cuda, cpu."
+    ),
+) -> None:
     """Run the studio in the foreground (Ctrl-C stops it), e.g. inside tmux."""
     import uvicorn
 
@@ -724,4 +732,4 @@ def studio_run(port: int = STUDIO_PORT) -> None:
 
     process.ensure_vendor(typer.echo)
     typer.echo(f"slm studio: http://localhost:{port}/  (Ctrl-C to stop)")
-    uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run(create_app(device=device), host="127.0.0.1", port=port, log_level="warning")

@@ -46,7 +46,7 @@ from slmkit.tokenizers import EOS_ID, Tokenizer, load_tokenizer
 from slmkit.tokenizers.base import EOS, UNK
 from slmkit.train.run import read_status
 
-CODE_VERSION = 2  # bump when the files an export writes would change (2: the ui/ viewer)
+CODE_VERSION = 3  # bump when the files an export writes would change (2: ui/; 3: example prompts)
 MODELS_DIR = "models"
 WEIGHTS = "model.safetensors"
 CARD = "MODEL_CARD.md"
@@ -318,6 +318,8 @@ def export_run(
         "vocab_size": run.tokenizer.vocab_size,
         "block_size": run.model.args.block_size,
         "example_prompt": example_prompt(prompts),
+        # Every prompt the evaluation used, so a playground can offer them as one-click examples.
+        "example_prompts": [{"id": p.id, "prompt": p.prompt} for p in prompts[:12]],
         "eval": (
             {
                 "eval_id": report["eval_id"],

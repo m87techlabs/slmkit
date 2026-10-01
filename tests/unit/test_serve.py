@@ -23,6 +23,7 @@ def test_health_and_info(client: TestClient) -> None:
     info = client.get("/info").json()
     assert info["stage"] == "pretrain" and info["example_prompt"] == "abc"
     assert info["defaults"]["eos_token_id"] == 1
+    assert info["examples"] == [{"id": "p", "prompt": "abc"}]  # every eval prompt, as Try: buttons
 
 
 def test_generate_is_reproducible_by_seed(client: TestClient) -> None:

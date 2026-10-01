@@ -94,6 +94,9 @@ class ModelServer:
             "vocab_size": stats["vocab_size"],
             "context_tokens": stats["block_size"],
             "example_prompt": stats["example_prompt"],
+            # Older exports recorded one example; newer ones every prompt the evaluation used.
+            "examples": stats.get("example_prompts")
+            or [{"id": "example", "prompt": stats["example_prompt"]}],
             "defaults": self.exported.generation,
             "device": str(self.device),
             "source_run": self.exported.manifest["inputs"]["run"],

@@ -112,14 +112,19 @@ class Models:
             return server
 
 
-def create_app(home: Path | None = None, repo: Path | None = None) -> FastAPI:
+def create_app(home: Path | None = None, repo: Path | None = None, device: str = "cpu") -> FastAPI:
+    """`device`: where playground models run. The studio defaults to the GPU when there is one
+    (`slm studio start`): a 10M-parameter model generates ~15x faster there, and a few seconds of
+    generation barely disturbs a training run. `slm serve` stays on the CPU (serving.md §6)."""
     home = home or artifacts.slm_home()
     repo = repo or repo_root()
     vendor = home / "studio" / "vendor"
     vendor.mkdir(parents=True, exist_ok=True)
     # Generation runs on server worker threads: cap PyTorch's CPU threads (serving.md §6).
     torch.set_num_threads(2)
-    models = Models(home, torch.device("cpu"))
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    models = Models(home, torch.device(device))
     runner = verify.Runner(home, repo)
     app = FastAPI(title="slm studio", description="See it in action: read-only views of $SLM_HOME.")
     app.mount("/static", StaticFiles(directory=WEB), name="static")

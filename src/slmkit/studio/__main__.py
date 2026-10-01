@@ -14,8 +14,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m slmkit.studio")
     parser.add_argument("--host", default="127.0.0.1", help="keep it local; see DESIGN 6.9")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument(
+        "--device", default="auto", help="where playground models run: auto, cuda, cpu"
+    )
     args = parser.parse_args()
-    uvicorn.run(create_app(), host=args.host, port=args.port, log_level="warning")
+    uvicorn.run(create_app(device=args.device), host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":
