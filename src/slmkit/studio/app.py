@@ -34,6 +34,7 @@ from slmkit.studio import data, learn, machine, sizing
 
 WEB = Path(__file__).parent / "web"
 KEEP_MODELS = 2
+ROOT_DOCS = ("README.md", "CONTRIBUTING.md")
 
 
 def fallback_viewer(model_path: Path, manifest: dict[str, Any]) -> Path | None:
@@ -161,11 +162,9 @@ def create_app(home: Path | None = None, repo: Path | None = None) -> FastAPI:
     @app.get("/api/doc", response_class=PlainTextResponse)
     def doc(path: str) -> str:
         try:
-            return (
-                data.read_doc(repo, path)
-                if path != "README.md"
-                else (repo / "README.md").read_text()
-            )
+            if path in ROOT_DOCS:  # the two Markdown files at the repo root
+                return (repo / path).read_text()
+            return data.read_doc(repo, path)
         except FileNotFoundError:
             raise HTTPException(404, f"no document {path}") from None
 

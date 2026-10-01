@@ -1,4 +1,8 @@
-# CONTRIBUTING.md — slmkit
+# Contributing to slmkit
+
+The rules every change to slmkit follows: what the repo is for, who its documentation is written
+for, the hard rules the code enforces, and the conventions for code, docs and commits. The docs
+cite them as "CONTRIBUTING.md rule N".
 
 ## What this project is
 
@@ -111,9 +115,9 @@ often for days. It is not a dedicated training box, and there is no deadline.
 7. **Single GPU, single process.** No DDP/FSDP code paths.
 8. **Checkpoints are full-state and atomic:** model, optimizer, scheduler, step, tokens_seen,
    sampler state and all RNG states. Write to `*.tmp`, fsync, rename.
-9. **Don't launch GPU runs longer than ~10 minutes yourself.** For longer runs, print the
-   command, config path and GPU-hour estimate from measured tokens/sec, and let the developer
-   start it in tmux.
+9. **Long GPU runs are started by a person, in tmux.** Anything that launches runs on its own
+   (a script, a sweep helper, an automated tool) stops at about 10 minutes of GPU work and prints
+   the command, the config path and a GPU-hour estimate from measured tokens/sec instead.
 10. Tracking must work with Docker stopped (tensorboard files or wandb cloud, never a
     containerized tracking server).
 

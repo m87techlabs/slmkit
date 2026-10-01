@@ -89,7 +89,8 @@ def doc_tree(repo: Path, project: str | None) -> list[dict[str, Any]]:
     add("Runbooks", [repo / b["file"] for b in runbooks(repo, project)])
     add(
         "Reference",
-        [docs / n for n in ("MODEL.md", "GLOSSARY.md", "STACK.md", "DESIGN.md", "ROADMAP.md")],
+        [docs / n for n in ("MODEL.md", "GLOSSARY.md", "STACK.md", "DESIGN.md", "ROADMAP.md")]
+        + [repo / "CONTRIBUTING.md"],
     )
     add("Decisions (ADRs)", sorted((docs / "decisions").glob("*.md")))
     return sections

@@ -79,6 +79,7 @@ uv run slm studio start   # "See it in action": everything you built, in your br
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Architecture, contracts, and the rules the code enforces |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Milestones and their exit criteria |
 | [`docs/decisions/`](docs/decisions/) | ADRs — what was decided, and what was rejected |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | The rules every change follows: hard rules, conventions, commits |
 
 ## Status
 
