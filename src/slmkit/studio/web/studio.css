@@ -173,3 +173,13 @@ svg.dotplot .dot:hover, svg.dotplot .dot:focus { fill: var(--accent); outline: n
 .stack-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
 .stack-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
 .error-text { color: var(--warn); }
+
+/* Verify */
+.check { margin-bottom: 14px; }
+.check pre.cmd { margin: 8px 0; }
+.section-title { margin: 24px 0 10px; }
+pre.diff .ln.differs { background: color-mix(in srgb, var(--s4) 22%, transparent); }
+pre.diff .ln.same { color: var(--good); }
+pre.diff .ln.cmd { color: var(--muted); }
+.live pre, .check pre.cmd { white-space: pre; overflow: auto; }
+.live pre { max-height: 420px; }

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -30,7 +30,7 @@ from slmkit.export.hf import load_export
 from slmkit.model import ModelArgs
 from slmkit.registry import ProjectNotFound, load_project
 from slmkit.serve.app import PAGE, GenerateRequest, GenerateResponse, ModelServer
-from slmkit.studio import data, learn, machine, sizing
+from slmkit.studio import data, learn, machine, sizing, verify
 
 WEB = Path(__file__).parent / "web"
 KEEP_MODELS = 2
@@ -51,6 +51,25 @@ def fallback_viewer(model_path: Path, manifest: dict[str, Any]) -> Path | None:
     except (KeyError, ConfigError, ProjectNotFound):
         return None
     return web if web is not None and (web / "viewer.js").is_file() else None
+
+
+class RunRequest(BaseModel):
+    """Which check to run: named by ID, never by command. The command comes from the runbook."""
+
+    runbook: str
+    check_id: str = Field(pattern=r"^[0-9a-f]{12}$")
+
+
+def same_origin(request: Request) -> None:
+    """Refuse a run request from any other web page. Without this, a site you visit could make
+    your browser POST here: the custom header forces a CORS preflight, which this server never
+    approves, and a mismatched Origin is refused outright."""
+    origin = request.headers.get("origin")
+    host = request.headers.get("host", "")
+    allowed = {f"http://{host}", f"http://localhost:{host.rpartition(':')[2]}",
+               f"http://127.0.0.1:{host.rpartition(':')[2]}"}  # fmt: skip
+    if request.headers.get("x-slm-studio") != "1" or (origin is not None and origin not in allowed):
+        raise HTTPException(403, "run requests are only accepted from the studio's own page")
 
 
 class SizeQuery(BaseModel):
@@ -101,6 +120,7 @@ def create_app(home: Path | None = None, repo: Path | None = None) -> FastAPI:
     # Generation runs on server worker threads: cap PyTorch's CPU threads (serving.md §6).
     torch.set_num_threads(2)
     models = Models(home, torch.device("cpu"))
+    runner = verify.Runner(home, repo)
     app = FastAPI(title="slm studio", description="See it in action: read-only views of $SLM_HOME.")
     app.mount("/static", StaticFiles(directory=WEB), name="static")
     app.mount("/vendor", StaticFiles(directory=vendor), name="vendor")
@@ -210,6 +230,37 @@ def create_app(home: Path | None = None, repo: Path | None = None) -> FastAPI:
         except FileNotFoundError:
             raise HTTPException(404, f"no image {path}") from None
         return FileResponse(file, media_type=media)
+
+    @app.get("/api/verify")
+    def verify_checks(project: str | None = None) -> dict[str, Any]:
+        return {"runbooks": verify.checks_for(repo, home, project), "results": runner.results()}
+
+    @app.post("/api/verify/run")
+    def verify_run(req: RunRequest, request: Request) -> dict[str, str]:
+        same_origin(request)
+        if req.runbook not in {b["file"] for b in data.runbooks(repo)}:
+            raise HTTPException(404, f"no runbook {req.runbook}")
+        check = next(
+            (c for c in verify.parse(repo, req.runbook, home) if c.id == req.check_id), None
+        )
+        if check is None:
+            raise HTTPException(404, "no such check (has the runbook changed? reload the page)")
+        try:
+            ex = runner.start(check)
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from None
+        except BlockingIOError as exc:
+            raise HTTPException(409, str(exc)) from None
+        return {"run_id": ex.id}
+
+    @app.get("/api/verify/runs/{run_id}")
+    def verify_progress(run_id: str) -> dict[str, Any]:
+        ex = runner.get(run_id)
+        if ex is None:
+            raise HTTPException(404, "unknown run")
+        with ex.lock:
+            return {"check_id": ex.check_id, "output": ex.output, "done": ex.done,
+                    "exit_code": ex.exit_code, "seconds": ex.seconds}  # fmt: skip
 
     # ---------------------------------------------------------------- playgrounds
 

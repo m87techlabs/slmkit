@@ -242,3 +242,113 @@ def test_flops_from_the_architecture_match_the_model(tie: bool) -> None:
     assert (
         flops_per_token(model) == 6 * (matmul + args.vocab_size * args.d_model) + 12 * 2 * 64 * 64
     )
+
+
+# ------------------------------------------------------------------------------ phase 3
+
+VERIFY_RUNBOOK = textwrap.dedent("""\
+    # Runbook: verify
+    <!-- slm-studio: projects=toy -->
+
+    ## Look
+
+    ```bash
+    ls $SLM_HOME   # where everything lives
+    ```
+    ```
+    runs
+    ```
+
+    ## Train
+
+    ```bash
+    uv run slm pretrain toy/base
+    ```
+
+    ## Script
+
+    ```bash
+    uv run python - <<'PY'
+    print(1)
+    PY
+    ```
+
+    ## Pipe
+
+    ```bash
+    uv run slm runs list | head
+    ```
+    """)
+
+
+@pytest.mark.parametrize(
+    ("command", "allowed"),
+    [("uv run slm runs summary --project x", True), ("uv run slm lineage pk-1", True),
+     ("uv run slm pretrain x/y", False), ("uv run slm eval run-1", False),
+     ("uv run slm studio stop", False), ("make test", True), ("make doctor", False),
+     ("uv run ruff check .", True), ("uv run ruff check --fix .", False), ("uv run ruff format .", False),
+     ("uv run python projects/toy/check_x.py keys", True), ("uv run python evil.py", False),
+     ("git log --oneline -3", True), ("git diff --output=/tmp/x", False), ("git push", False),
+     ("ls $SLM_HOME", True), ("cat /etc/passwd", False), ("ls $SLM_HOME/../..", False),
+     ("rm -rf $SLM_HOME", False), ("uv run slm runs list | head", False),
+     ("echo $(whoami)", False), ("A=1 uv run slm runs list", False)],
+)  # fmt: skip
+def test_only_read_only_commands_may_run(
+    command: str, allowed: bool, slm_home: Path, toy_repo: Path
+) -> None:
+    from slmkit.studio import verify
+
+    slm_home.mkdir(parents=True, exist_ok=True)
+    assert verify.classify(command, slm_home, toy_repo)[0] is allowed
+
+
+@pytest.fixture
+def verify_book(studio: TestClient, toy_repo: Path) -> TestClient:
+    (toy_repo / "docs" / "runbooks" / "m9-verify.md").write_text(VERIFY_RUNBOOK)
+    return studio
+
+
+def _checks(client: TestClient) -> dict[str, dict]:  # type: ignore[type-arg]
+    books = client.get("/api/verify?project=toy").json()["runbooks"]
+    (book,) = [b for b in books if b["file"].endswith("m9-verify.md")]
+    return {c["heading"]: c for c in book["checks"]}
+
+
+def test_runbook_checks_are_parsed_with_expected_output(verify_book: TestClient) -> None:
+    checks = _checks(verify_book)
+    assert checks["Look"]["commands"] == ["ls $SLM_HOME"] and checks["Look"]["expected"] == "runs"
+    assert checks["Look"]["runnable"]
+    assert not checks["Train"]["runnable"] and "terminal" in checks["Train"]["reason"]
+    assert not checks["Script"]["runnable"] and "heredoc" in checks["Script"]["reason"]
+    assert "    print(1)" not in checks["Script"]["text"] and "print(1)" in checks["Script"]["text"]
+    assert not checks["Pipe"]["runnable"]
+
+
+def test_a_check_runs_only_when_asked_by_the_studio_itself(
+    verify_book: TestClient, slm_home: Path
+) -> None:
+    import time
+
+    look = _checks(verify_book)["Look"]
+    body = {"runbook": "docs/runbooks/m9-verify.md", "check_id": look["id"]}
+    assert verify_book.post("/api/verify/run", json=body).status_code == 403  # no header
+    evil = verify_book.post("/api/verify/run", json=body,
+                            headers={"x-slm-studio": "1", "origin": "https://evil.example"})  # fmt: skip
+    assert evil.status_code == 403
+    ok = verify_book.post("/api/verify/run", json=body, headers={"x-slm-studio": "1"})
+    assert ok.status_code == 200
+    for _ in range(100):
+        p = verify_book.get(f"/api/verify/runs/{ok.json()['run_id']}").json()
+        if p["done"]:
+            break
+        time.sleep(0.05)
+    assert p["exit_code"] == 0 and "runs" in p["output"]
+    saved = json.loads((slm_home / "studio" / "verify.json").read_text())
+    assert saved[look["id"]]["exit_code"] == 0
+    train = _checks(verify_book)["Train"]
+    refused = verify_book.post("/api/verify/run", headers={"x-slm-studio": "1"},
+                               json={"runbook": "docs/runbooks/m9-verify.md", "check_id": train["id"]})  # fmt: skip
+    assert refused.status_code == 403
+    unknown = verify_book.post("/api/verify/run", headers={"x-slm-studio": "1"},
+                               json={"runbook": "docs/runbooks/m9-verify.md", "check_id": "0" * 12})  # fmt: skip
+    assert unknown.status_code == 404

@@ -15,6 +15,7 @@ const PAGES = [
   { id: "parameters", title: "Parameters", module: "./pages/parameters.js" },
   { id: "playground", title: "Playground", module: "./pages/playground.js" },
   { id: "learn", title: "Learn", module: "./pages/learn.js" },
+  { id: "verify", title: "Verify", module: "./pages/verify.js" },
 ];
 
 const root = document.getElementById("page");
