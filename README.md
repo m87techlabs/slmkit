@@ -69,6 +69,7 @@ uv run slm studio start   # "See it in action": everything you built, in your br
 
 | | |
 |---|---|
+| [`docs/concepts/two-models.md`](docs/concepts/two-models.md) | **No music background?** What the two models do, and how to read their output |
 | `slm studio` | **See it in action.** A local web app over your runs, artifacts, models and machine ([runbook](docs/runbooks/studio.md)) |
 | [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md) | **Start here.** The model development lifecycle, with diagrams of the pipeline, architecture and roadmap |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Every abbreviation and term, in plain language |

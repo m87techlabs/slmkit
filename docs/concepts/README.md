@@ -11,6 +11,7 @@ until its pages exist — the documentation is part of the deliverable, not a fo
 
 | Page | Milestone | Covers |
 |---|---|---|
+| [`two-models.md`](two-models.md) | M1 · M2 | **Start here if you don't read music.** The Shakespeare and folk-tune models side by side, what M2 set out to prove, how to read a generated tune, and prompts to try |
 | [`environment.md`](environment.md) | M0 ☑ | Why WSL, how the GPU reaches Linux, why `sm_120` matters, storage, reading the benchmark |
 | [`tokenization.md`](tokenization.md) | M1 ☑ · M2 ☑ | Turning text into tokens, splitting by group, packing, the one-token shift; BPE built and compared with char by bits per character (§6) |
 | [`the-model.md`](the-model.md) | M1 ☑ | What a decoder-only transformer does, walked through this repo's code |

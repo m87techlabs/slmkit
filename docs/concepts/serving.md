@@ -230,6 +230,9 @@ It uses the same `/info` and `/generate` endpoints as `curl`, and shows the stat
 carries: whether the model finished by itself, tokens per second, the seed (with a link that reproduces
 the result), and a warning when the prompt contains characters the vocabulary doesn't have.
 
+**Every playground offers examples.** Exports record every prompt the evaluation used, and the page shows
+them as **Try:** buttons above the prompt box; the box itself takes any text.
+
 **What a result looks like is the project's decision.** A project may ship a small viewer (ADR 0008):
 a directory with `viewer.js`, an ES module that exports `setup()` (controls that build a prompt) and
 `render()` (draw one result). `slm export` copies it into the model as `ui/`, the page imports it from
@@ -244,6 +247,10 @@ still everything needed to serve the model.
 - **draws sheet music and plays it** with abcjs, a JavaScript ABC library, in fiddle, piano, flute,
   accordion or harp sound, highlighting each note as it plays;
 - **reports what abcjs couldn't read**, the browser's view of the `plays` grader;
+- **reads the tune in plain words** ("Reading this tune"): what you asked for next to what it wrote
+  (rhythm, time signature, key), what each header means, how many bars, and whether it ends on the
+  home note. It is an explanation for someone who doesn't read music; the graders are the measurement
+  (two-models.md §3);
 - **offers `.abc` and `.mid` downloads** of exactly what is on screen.
 
 **Rejected:** rendering MIDI on the server with `abc2midi`, as `--to-windows` does. The server would

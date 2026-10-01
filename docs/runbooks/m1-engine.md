@@ -1073,3 +1073,31 @@ means is in [`../concepts/metrics.md`](../concepts/metrics.md).
       machine reboot. A reboot additionally tests that the fsync'd files survive a power cut.
 - [x] MFU logged and plausible for the size: 52.9% at `ref` (Phase C, C.1).
 - [x] `make test` on the CPU in under 60 s: 89 tests in ~8 s.
+
+---
+
+# See it in slm studio
+
+The reference model can be typed into. Export its best checkpoint (validation loss 1.2888, step 1250),
+then open it in the studio's Playground with **shakespeare_char** selected:
+
+```bash
+uv run slm export run-a1d5 --name shakespeare --version 1
+```
+```
+checking parity on 1.tmp ...
+  slmkit round trip: max |Δlogit| = 0.0e+00 over 71 tokens
+  transformers 5.17.0: max |Δlogit| = 0.0e+00, tokenizer IDs match: True
+exported shakespeare:1 -> ~/slm/models/shakespeare/1
+```
+
+Press **Try: ROMEO**, or type the start of a speech (`JULIET:` and a new line, then `O Romeo, Romeo,`).
+It writes verse in Shakespeare's style, made-up words included: 10.6M parameters, one character at a
+time, trained on 1 MB. On the GPU the studio writes about 190 characters a second. What to try, and why it
+can't chat: [`../concepts/two-models.md`](../concepts/two-models.md) §4.
+
+| Page | What of M1 you'll see |
+|---|---|
+| **Training** | the reference run's curves: validation loss bottoming out at step 1250 and climbing after (overfitting, fitting.md), and "watch it learn" from random characters to verse |
+| **Lifecycle** | the Shakespeare text, its char tokenizer and packed data, and the three M1 runs |
+| **Parameters** | the `ref` preset: 10.6M parameters, and what this GPU measured for it |
