@@ -474,6 +474,25 @@ what each check really runs. It is a thin wrapper; the logic lives in Python.
 content-addressed and immutable already, which is closer to a Terraform state backend than to
 source.
 
+### GitHub Actions and setup-uv
+**●** (since v0.1.0) · [Actions](https://docs.github.com/actions) · [setup-uv](https://github.com/astral-sh/setup-uv)
+
+**What it is.** GitHub's hosted CI. `.github/workflows/ci.yml` runs on every push and pull request.
+`astral-sh/setup-uv` installs uv and caches its downloads between runs.
+
+**Why.** Every change gets the same checks a contributor runs locally (`make lint`, `make test`), on
+a clean machine, so "works on my machine" is caught before review. Only the CPU suite runs there: the
+runners have no GPU, so `make test-gpu` stays a local check. PyTorch comes from the CUDA 12.8 index
+(about 2.5 GB), and the uv cache keyed on `uv.lock` keeps later runs fast. Rejected: installing a
+CPU-only PyTorch wheel in CI, which would mean CI tests a different lock than everyone installs.
+
+### shields.io
+**●** (README badges) · [docs](https://shields.io/)
+
+**What it is.** A service that draws small status images ("badges").
+
+**Why.** The README's licence and Python-version badges. The CI badge comes from GitHub itself.
+
 ### VS Code (with the WSL extension)
 **●** · [VS Code + WSL](https://code.visualstudio.com/docs/remote/wsl)
 

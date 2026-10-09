@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/m87techlabs/slmkit/discussions
+    about: Ask how something works, or share what you trained. Issues are for bugs and concrete proposals.
+  - name: Start with the docs
+    url: https://github.com/m87techlabs/slmkit/blob/main/docs/LIFECYCLE.md
+    about: The lifecycle, the glossary and the per-milestone runbooks answer most questions.

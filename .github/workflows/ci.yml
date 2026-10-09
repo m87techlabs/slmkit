@@ -1,0 +1,40 @@
+# Lint and the CPU test suite on every push and pull request. GPU tests (`make test-gpu`) need a GPU
+# and run on the developer's machine; see CONTRIBUTING.md.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      # abc2midi is the reference ABC player; the abc_music graders and tests call it.
+      - name: System packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends abcmidi
+
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true # the PyTorch wheel comes from the CUDA 12.8 index: ~2.5 GB, cached by uv.lock
+
+      - name: Install
+        run: uv sync --locked --extra dev --extra abc_music --extra export
+
+      - name: Lint (ruff, mypy)
+        run: make lint
+
+      - name: CPU tests
+        run: make test

@@ -1,0 +1,32 @@
+name: Feature or project idea
+description: Suggest an improvement, a new grader, or a new project for slmkit.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would it make possible?
+      description: The problem or the learning goal, in a sentence or two.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposal
+      description: |
+        How it could work. For a new project: where the data comes from (and its licence), and how a
+        program could grade the model's output — slmkit only takes on projects with an automatic grader.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Engine (data, model, training, eval, export, serve)
+        - A project (a new one, or graders for an existing one)
+        - slm studio
+        - Documentation
+        - Other
+    validations:
+      required: true

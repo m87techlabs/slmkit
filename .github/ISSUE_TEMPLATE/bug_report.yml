@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in slmkit doesn't work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The environment details below are what make most problems reproducible.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got. Paste the full command and its output.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `make doctor`
+      description: Run it from the repo root and paste everything it prints.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and VRAM
+      placeholder: e.g. RTX 4070, 12 GB
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Windows 11 + WSL2 Ubuntu 24.04, or Ubuntu 24.04 native
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: slmkit commit
+      description: Output of `git rev-parse --short HEAD`.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: The experiment YAML, the run ID, or the relevant part of `train.log`.

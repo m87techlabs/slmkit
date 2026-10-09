@@ -193,6 +193,9 @@ part of the current milestone — implement it rather than inventing a different
 
 ## Workflow expectations
 
+- **Changes arrive as pull requests** from a branch; CI (`.github/workflows/ci.yml`) runs `make lint`
+  and `make test` on every push and must be green. Add user-visible changes to `CHANGELOG.md` under
+  "Unreleased".
 - **Plan first** for anything touching more than two files: list files, interfaces and tests,
   then implement.
 - Keep changes small and milestone-scoped. Tick `docs/ROADMAP.md` checkboxes when exit criteria

@@ -515,6 +515,12 @@ immediately with a clear message instead of halfway through a run.
 
 **ruff / mypy / pytest.** Linter and formatter; static type checker; test runner.
 
+**CI — Continuous Integration.** Running the checks automatically on every change, on a clean machine.
+slmkit's runs `make lint` and `make test` on GitHub Actions.
+
+**PR — Pull Request.** A proposed change on its own branch, reviewed (and checked by CI) before it is
+merged into `main`.
+
 **API — Application Programming Interface.** The contract a program offers other programs. For
 `slm serve`, an **HTTP** (HyperText Transfer Protocol) API: JSON requests to `/generate`, JSON
 responses back. A **422** response means the request body failed validation.
