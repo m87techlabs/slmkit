@@ -152,11 +152,13 @@ buttons execute read-only commands from a fixed list only. *~3–4 sessions, no 
 
 Goal: a public repo a newcomer can evaluate in a minute and contribute to without asking. *No GPU.*
 
-- [ ] CI: lint and the CPU tests on every push and pull request (`.github/workflows/ci.yml`).
-- [ ] README: badges, a "Results so far" table where every number links to its source, and plain
+- [x] CI: lint and the CPU tests on every push and pull request (`.github/workflows/ci.yml`); about
+      2½ minutes per run.
+- [x] README: badges, a "Results so far" table where every number links to its source, and plain
       hardware requirements (tested on WSL2; native Linux expected; no macOS or AMD).
-- [ ] Issue templates (bug report asks for `make doctor` output), a pull-request checklist.
-- [ ] `CHANGELOG.md` with v0.1.0 (M0–M2, slm studio), and the release tagged from it.
+- [x] Issue templates (bug report asks for `make doctor` output), a pull-request checklist.
+- [x] `CHANGELOG.md` with v0.1.0 (M0–M2, slm studio).
+- [ ] The v0.1.0 release tagged from it.
 - [ ] Repository topics, and Discussions enabled for questions.
 
 ---
