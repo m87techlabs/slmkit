@@ -186,9 +186,9 @@ def check_bitsandbytes() -> Check:
 
     try:
         p = torch.nn.Parameter(torch.randn(256, 256, device="cuda"))
-        opt = bnb.optim.AdamW8bit([p], lr=1e-4)  # type: ignore[attr-defined,no-untyped-call]
+        opt = bnb.optim.AdamW8bit([p], lr=1e-4)  # type: ignore[attr-defined,no-untyped-call,unused-ignore]
         (p * p).sum().backward()  # type: ignore[no-untyped-call]
-        opt.step()  # type: ignore[no-untyped-call]
+        opt.step()  # type: ignore[no-untyped-call,unused-ignore]
         return Check(
             "bitsandbytes",
             Status.OK,

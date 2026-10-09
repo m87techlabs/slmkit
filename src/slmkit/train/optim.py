@@ -33,7 +33,7 @@ def build_optimizer(
             import bitsandbytes as bnb
         except ImportError as exc:  # pragma: no cover - depends on the optional extra
             raise RuntimeError("optimizer adamw8bit needs `uv sync --extra optim8bit`") from exc
-        opt: torch.optim.Optimizer = bnb.optim.AdamW8bit(  # type: ignore[attr-defined,no-untyped-call]
+        opt: torch.optim.Optimizer = bnb.optim.AdamW8bit(  # type: ignore[attr-defined,no-untyped-call,unused-ignore]
             groups, lr=cfg.lr, betas=cfg.betas
         )
         return opt
