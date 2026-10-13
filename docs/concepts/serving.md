@@ -301,18 +301,21 @@ says Apache-2.0 *and* states the open question about its transcriptions (ADR 000
 withdraw the model if anyone objects. A project that says nothing gets no licence on its card rather
 than an invented one.
 
-**The demo is `slm serve`, unchanged.** A Hugging Face *Space* is a demo app built from its own git
-repository; a Docker Space builds a Dockerfile and sends visitors to one port. slmkit's Space installs
-CPU-only PyTorch and a released slmkit, downloads the model by version tag, and runs
-`slm serve --host 0.0.0.0 --port 7860`. The page visitors see is the playground from §8, viewer and
-all. Measured on the same recipe in a clean environment: one jig, 160 tokens, in 0.36 s on a CPU.
+**The demo is the same playground, with no server.** A Hugging Face *Space* is a demo app hosted from
+its own git repository. The first plan was a Docker Space running `slm serve`. It worked when tested
+locally (one jig in 0.36 s on a CPU), but Hugging Face now charges for Docker Spaces. A *static* Space,
+which only serves files, is free. slmkit's models are small enough for the browser to run them, so
+`slm site abc-folk:3` builds the playground page plus `model.js`, the same network written in
+JavaScript, and the model's files. Each visitor's browser generates the tunes, at about 1,500
+tokens/s. [`browser-inference.md`](browser-inference.md) explains how, and ADR 0011 records the
+decision.
 
 **Rejected:** a Gradio app, the Hub's usual choice. It would be a second interface to keep in step with
 the first, and a framework slmkit doesn't otherwise use (CONTRIBUTING.md rule 6). **Rejected:** renaming
 `MODEL_CARD.md` to `README.md`; the upload copies it instead.
 
-Versions carry over: `abc-folk:3` is the model repository's tag `v3`, and the Space downloads that tag,
-so it keeps serving the version it was built for.
+Versions carry over: `abc-folk:3` is the model repository's tag `v3`, and the site for it is built from
+that export, so the demo shows the version it was built for.
 
 The steps, with real output and the pitfalls met on the way: [`../runbooks/hf-hub.md`](../runbooks/hf-hub.md).
 The published model: [huggingface.co/m87techlabs/abc-folk](https://huggingface.co/m87techlabs/abc-folk).

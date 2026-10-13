@@ -20,7 +20,7 @@ same pipeline:
 
 **Read before architectural work:** `docs/DESIGN.md` (architecture, contracts, rules),
 `docs/MODEL.md` (the model spec: architecture, presets, file formats; keep it in sync with
-`src/slmkit/model/` and `presets/model/`) and `docs/ROADMAP.md` (current milestone and exit
+`src/slmkit/model/`, `presets/model/` and the browser copy in `src/slmkit/serve/static/model.js`) and `docs/ROADMAP.md` (current milestone and exit
 criteria). Work on the current milestone only.
 
 ## Vocabulary
@@ -141,6 +141,7 @@ uv run slm runs list                          # tokens done/target, GPU-hours, l
 uv run slm runs compare <run_a> <run_b>
 uv run slm export <run_id> --name <model> --version <n>
 uv run slm serve --model <model>:<n>
+uv run slm site <model>:<n>                   # static site; the model runs in the browser
 uv run slm studio start | stop | status | run  # "See it in action": the local web studio
 uv run slm lineage <artifact_id>
 ```

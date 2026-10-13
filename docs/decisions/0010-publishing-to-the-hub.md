@@ -1,6 +1,8 @@
 # ADR 0010 — Publishing models to the Hugging Face Hub, and the `model_card_info` hook
 
-**Status:** accepted (after v0.1.0)
+**Status:** accepted (after v0.1.0). Decision 5, the demo as a Docker Space, is replaced by
+[ADR 0011](0011-browser-inference.md): Docker Spaces turned out to need a paid plan, so the demo is a
+static site with the model running in the browser.
 
 ## Context
 

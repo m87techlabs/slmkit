@@ -11,6 +11,10 @@ interfaces; each entry says what moved. Milestones (M0, M1, …) are described i
 - Model cards open with Hugging Face Hub metadata (licence, library, task, tags), so an export can be
   uploaded as is. A new optional Project API hook, `model_card_info()`, gives the licence, subject tags
   and data statement; `abc_music` and `shakespeare_char` state theirs (ADR 0010). Export code version 4.
+- `slm site`: a static web site where the model runs in the visitor's browser, with no server.
+  `model.js` is the network written out in JavaScript, with a key/value cache, tested against PyTorch in
+  headless Chrome (logits within 1e-4, greedy output token for token). The playground page uses it when
+  `info` says `"engine": "browser"`; project viewers work unchanged (ADR 0011).
 - `abc-folk` on the Hugging Face Hub ([m87techlabs/abc-folk](https://huggingface.co/m87techlabs/abc-folk)),
   and a runbook for publishing an export there (`docs/runbooks/hf-hub.md`).
 
