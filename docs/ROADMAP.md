@@ -166,12 +166,13 @@ Goal: a public repo a newcomer can evaluate in a minute and contribute to withou
 ## Hugging Face Hub: the folk-tune model and a live demo ◐
 
 Goal: anyone can load `abc-folk` with `transformers`, or try it in a browser, without installing
-anything. *No GPU.* Decisions: ADR 0010.
+anything. *No GPU.* Decisions: ADR 0010. Runbook: `runbooks/hf-hub.md`.
 
 - [x] Model cards carry Hub metadata, with the licence and data statement from the project
       (`model_card_info()`); `abc-folk:3` exported with it (runbook M2 §E.7).
 - [x] The demo recipe tested locally: CPU PyTorch, slmkit v0.1.0, `slm serve` (one jig in 0.36 s).
-- [ ] `abc-folk:3` published on the Hub (tag `v3`), and loads there with `transformers`.
+- [x] `abc-folk:3` published on the Hub (tag `v3`), byte-identical to the export, and loads there
+      anonymously with `transformers` (runbook H.4).
 - [ ] The Space is live, and the README links to it.
 
 ---

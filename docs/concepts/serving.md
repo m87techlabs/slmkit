@@ -314,6 +314,9 @@ the first, and a framework slmkit doesn't otherwise use (CONTRIBUTING.md rule 6)
 Versions carry over: `abc-folk:3` is the model repository's tag `v3`, and the Space downloads that tag,
 so it keeps serving the version it was built for.
 
+The steps, with real output and the pitfalls met on the way: [`../runbooks/hf-hub.md`](../runbooks/hf-hub.md).
+The published model: [huggingface.co/m87techlabs/abc-folk](https://huggingface.co/m87techlabs/abc-folk).
+
 ---
 
 ## 10. What export doesn't do yet
