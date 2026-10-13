@@ -69,6 +69,28 @@ class GenerateResponse(BaseModel):
     tokens_per_second: float
 
 
+def model_info(exported: ExportedModel, *, device: str, viewer: str | None) -> dict[str, Any]:
+    """What the playground page needs to know about a model: GET /info, or the static `info`
+    file of a site built by `slm site` (which adds "engine": "browser")."""
+    stats = exported.manifest["stats"]
+    return {
+        "model": exported.ref,
+        "project": exported.manifest["project"],
+        "stage": stats["stage"],
+        "params": stats["params"],
+        "vocab_size": stats["vocab_size"],
+        "context_tokens": stats["block_size"],
+        "example_prompt": stats["example_prompt"],
+        # Older exports recorded one example; newer ones every prompt the evaluation used.
+        "examples": stats.get("example_prompts")
+        or [{"id": "example", "prompt": stats["example_prompt"]}],
+        "defaults": exported.generation,
+        "device": device,
+        "source_run": exported.manifest["inputs"]["run"],
+        "viewer": viewer,
+    }
+
+
 class ModelServer:
     """One exported model, ready to answer: what `slm serve` wraps in an app, and what
     `slm studio` keeps one of per model it serves."""
@@ -85,24 +107,9 @@ class ModelServer:
         return self.ui if (self.ui / "viewer.js").is_file() else None
 
     def info(self) -> dict[str, Any]:
-        stats = self.exported.manifest["stats"]
-        return {
-            "model": self.exported.ref,
-            "project": self.exported.manifest["project"],
-            "stage": stats["stage"],
-            "params": stats["params"],
-            "vocab_size": stats["vocab_size"],
-            "context_tokens": stats["block_size"],
-            "example_prompt": stats["example_prompt"],
-            # Older exports recorded one example; newer ones every prompt the evaluation used.
-            "examples": stats.get("example_prompts")
-            or [{"id": "example", "prompt": stats["example_prompt"]}],
-            "defaults": self.exported.generation,
-            "device": str(self.device),
-            "source_run": self.exported.manifest["inputs"]["run"],
-            # Relative to the page, so the same page works at / and under a prefix (slm studio).
-            "viewer": "ui/viewer.js" if self.viewer_dir else None,
-        }
+        # Relative to the page, so the same page works at / and under a prefix (slm studio).
+        viewer = "ui/viewer.js" if self.viewer_dir else None
+        return model_info(self.exported, device=str(self.device), viewer=viewer)
 
     def generate(self, req: GenerateRequest) -> GenerateResponse:
         defaults, tok, device = self.exported.generation, self.exported.tokenizer, self.device

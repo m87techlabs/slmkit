@@ -12,6 +12,10 @@
 
   Everything the model writes is inserted as text, never as HTML.
 
+  With no server at all (`slm site`, ADR 0011), "info" is a static file that says
+  "engine": "browser". The page then runs the model itself, in a Web Worker (engine-worker.js and
+  model.js, next to this page), and gets back the same JSON /generate would have returned.
+
   URL parameters prefill the form, so a result can be shared or reproduced as a link:
     /?prompt=%25%20a%20jig%20in%20G%20major%2C%206%2F8%20time%0A&seed=3&temperature=0.8&go=1
   (go=1 generates on load.)
@@ -119,7 +123,7 @@
 </main>
 <script type="module">
 const $ = (id) => document.getElementById(id);
-let info = null, viewer = null;
+let info = null, viewer = null, engine = null;
 const history = [];
 
 function text(tag, content, cls) {
@@ -135,6 +139,7 @@ async function start() {
   $("meta").textContent = `${info.project} · ${info.stage === "sft" ? "fine-tuned (SFT)" : "pretrained base"}` +
     ` · ${info.params.toLocaleString()} parameters · ${info.context_tokens}-token context · ${info.device}`;
   document.title = `${info.model} · slmkit`;
+  if (info.engine === "browser") engine = browserEngine();
   $("prompt").value = info.example_prompt;
   $("prompt-hint").textContent = "Type anything, or start from an example. The trailing newline matters.";
   $("examples").replaceChildren(text("span", "Try:", "hint"), ...info.examples.map((ex) => {
@@ -166,6 +171,33 @@ async function start() {
   if (params.get("go") === "1") generate();
 }
 
+// The model, running in this browser: a Web Worker that loads the export's files once.
+function browserEngine() {
+  const worker = new Worker(new URL("engine-worker.js", location.href), { type: "module" });
+  const waiting = new Map();
+  let next = 0;
+  worker.onmessage = ({ data }) => {
+    const call = waiting.get(data.id);
+    waiting.delete(data.id);
+    if (data.error) call.reject(new Error(data.error)); else call.resolve(data.result);
+  };
+  worker.onerror = (e) => {
+    for (const call of waiting.values()) call.reject(new Error(e.message || "the model failed to start"));
+    waiting.clear();
+  };
+  const send = (message) => new Promise((resolve, reject) => {
+    const id = next++;
+    waiting.set(id, { resolve, reject });
+    worker.postMessage({ id, ...message });
+  });
+  const ready = send({ type: "load", name: info.model, base: new URL(info.files, location.href).href });
+  $("go").disabled = true;
+  ready.then(() => { $("go").disabled = false; }, (err) => {
+    $("result").replaceChildren(text("p", `The model could not load in this browser: ${err.message}`, "error"));
+  });
+  return { generate: async (body) => { await ready; return send({ type: "generate", body }); } };
+}
+
 function showTemperature() {
   const t = Number($("temperature").value);
   $("temperature-value").textContent = `${t.toFixed(2)}${t === info?.defaults.temperature ? " (eval default)" : ""}`;
@@ -178,6 +210,12 @@ async function generate() {
   $("go").disabled = true;
   $("result").replaceChildren(text("p", "Generating…", "empty"));
   try {
+    if (engine) {
+      // The worker generates; this page stays responsive meanwhile.
+      history.unshift({ result: await engine.generate(body), at: new Date() });
+      show(0);
+      return;
+    }
     const response = await fetch("generate", { method: "POST",
       headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const data = await response.json();
@@ -189,7 +227,8 @@ async function generate() {
     history.unshift({ result: data, at: new Date() });
     show(0);
   } catch (err) {
-    $("result").replaceChildren(text("p", `Could not reach the server: ${err}`, "error"));
+    const where = engine ? "The model in this browser failed" : "Could not reach the server";
+    $("result").replaceChildren(text("p", `${where}: ${err.message ?? err}`, "error"));
   } finally {
     $("go").disabled = false;
   }
