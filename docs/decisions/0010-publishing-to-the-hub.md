@@ -44,6 +44,12 @@ load it or try it in a browser, needed three more things:
 - A project that says nothing gets an honest card: no licence claimed, a pointer to its README.
 - The demo is the same code and page a reader runs locally, so it can't drift from slmkit, and it
   needs no slmkit change. Its cost is a CPU-only Docker image of about 1 GB, built by the Hub.
+- **Where the Space lives** (found when publishing): Hugging Face charges organisations for Docker
+  Spaces, even on the free CPU tier (`402 Payment Required`). Static Spaces stay free for
+  organisations, and personal accounts can still run a Docker Space for free. The Space therefore lives
+  under a personal account and serves the organisation's model. If that changes, the Space moves; the
+  model doesn't. A static Space would need the model to run in the browser: a JavaScript forward
+  pass with its own parity test, which is possible for a model this size but is a project of its own.
 - Hub versions follow slmkit's: `abc-folk:3` is the model repo's tag `v3`. The repo's `main` may move
   on; the Space pins a tag.
 

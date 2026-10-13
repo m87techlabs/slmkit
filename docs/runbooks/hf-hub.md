@@ -11,7 +11,7 @@ anyone can try in a browser. The steps are generic; the worked example is `abc-f
 | | Where | What |
 |---|---|---|
 | **Model** | [huggingface.co/m87techlabs/abc-folk](https://huggingface.co/m87techlabs/abc-folk) | the export directory as is, plus `README.md` (a copy of `MODEL_CARD.md`). Tag `v3` = slmkit's `abc-folk:3` |
-| **Space** | [huggingface.co/spaces/m87techlabs/abc-folk](https://huggingface.co/spaces/m87techlabs/abc-folk) | a Dockerfile that installs a released slmkit and runs `slm serve` on the model's `v3` tag |
+| **Space** | [huggingface.co/spaces/m87admin/abc-folk](https://huggingface.co/spaces/m87admin/abc-folk) | a Dockerfile that installs a released slmkit and runs `slm serve` on the model's `v3` tag |
 
 Publishing is the one step in slmkit that is **outward-facing and hard to take back**: once public,
 files can be copied. Every step here is run by a person, and nothing in slmkit publishes on its own.
@@ -64,6 +64,11 @@ hf auth whoami
   the *Username* field with an email address. Saving would have tried to rename the account. Check
   every field before pressing Save there.
 - **A 403 after that is the token**: a fine-grained token without write access to that organisation.
+- **Organisations pay for Docker Spaces.** Creating the Space under the organisation returned
+  `402 Payment Required: … hosting Gradio and Docker Spaces on free cpu-basic requires a Team or
+  Enterprise plan for organization m87techlabs`. Static Spaces (HTML only) stay free for organisations,
+  and personal accounts can still run a Docker Space on the free CPU tier. So the Space lives under the
+  personal account `m87admin` and serves the organisation's model (H.5).
 
 ---
 
@@ -231,20 +236,21 @@ which links the model page and the Space to each other.
 **How.**
 
 ```bash
-hf repos create m87techlabs/abc-folk --type space --sdk docker
-hf upload m87techlabs/abc-folk <dir with Dockerfile and README.md> . --type space \
+hf repos create m87admin/abc-folk --type space --sdk docker
+hf upload m87admin/abc-folk <dir with Dockerfile and README.md> . --type space \
   --commit-message "slm serve (slmkit v0.1.0) for abc-folk:3"
 ```
 
-A model and a Space can share a name: they are different repository types. The first build takes a
-few minutes; its log is at `https://huggingface.co/spaces/m87techlabs/abc-folk?logs=build`.
+It is created under the personal account: organisations need a paid plan for Docker Spaces (H.1).
+The Space's README still names the organisation's model, so the two pages link to each other. The first build takes a
+few minutes; its log is at `https://huggingface.co/spaces/m87admin/abc-folk?logs=build`.
 
 **Verify.** The recipe was first run by hand in a clean virtual environment (CPU PyTorch 2.11.0, slmkit
 from the v0.1.0 tarball, `slm serve --model abc-folk:3`): one jig of 160 tokens in 0.36 s, 446 tokens/s.
 Against the live Space:
 
 ```bash
-curl -s https://m87techlabs-abc-folk.hf.space/health
+curl -s https://m87admin-abc-folk.hf.space/health
 ```
 
 **Why it's built this way.**
@@ -266,7 +272,7 @@ curl -s https://m87techlabs-abc-folk.hf.space/health
   it `v4`, then change `MODEL_REV` and the model version in the Space's Dockerfile and upload that.
   `v3` stays downloadable.
 - **Withdrawal**, if a rights-holder objects to the data (ADR 0005), is one command per repository:
-  `hf repos delete m87techlabs/abc-folk --type space` and `hf repos delete m87techlabs/abc-folk`.
+  `hf repos delete m87admin/abc-folk --type space` and `hf repos delete m87techlabs/abc-folk`.
 
 ---
 
