@@ -269,6 +269,39 @@ hf upload m87techlabs/abc-folk <the Space's README.md> README.md --type space \
 A model and a Space can share a name: they are different repository types. A static Space has no build
 step; it is live within a minute.
 
+**Check the live Space**, from anywhere, with no token: the Space's metadata, the page's `info` file,
+and the weights it serves (the same SHA-256 as the export, H.4):
+
+```bash
+curl -s https://huggingface.co/api/spaces/m87techlabs/abc-folk | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(d['id'], d['sdk'], d['runtime']['stage'], 'model:', ', '.join(d['models']))"
+curl -s https://m87techlabs-abc-folk.static.hf.space/info | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(d['model'], d['engine'], d['device'])"
+curl -sL https://m87techlabs-abc-folk.static.hf.space/model/model.safetensors | sha256sum | cut -d' ' -f1
+```
+
+```
+m87techlabs/abc-folk static RUNNING model: m87techlabs/abc-folk
+abc-folk:3 browser your browser
+0ff22be8daed1a48fc80205f4fe484774a95e2f23762e2e9ed86b2cb99024af9
+```
+
+Then open the Space, click **jig-G** and **Generate**. Measured from here in Chrome: seed 3 gives the same
+jig as the local site, 189 tokens in 0.11 s.
+
+**Two things the Hub does to a static Space**, both harmless:
+
+- It serves large files (the weights) by redirecting to its file storage, on another domain. `fetch`
+  follows the redirect, and the storage allows cross-origin reads, so the page loads the model as it
+  does locally.
+- It adds one `<script>` line to `index.html` (the Space's ID). Creating the Space also commits its
+  template's `style.css`; the page doesn't use it, and
+  `hf repos delete-files m87techlabs/abc-folk style.css --type space` removes it.
+
 **Why it's built this way.**
 
 - **No server:** a Docker Space needs a paid plan (H.1), and a server is more than a 3.5 MB model needs.
@@ -299,6 +332,6 @@ step; it is live within a minute.
 - [x] The Hub's weights are byte-identical to the export, and `transformers` loads them anonymously and
       generates the expected tune (H.4).
 - [x] `slm site` builds the static site, and `model.js` matches PyTorch in Chrome (H.5).
-- [ ] The static Space is live; the playground draws and plays a tune there (H.5).
-- [ ] The README links to the Space.
+- [x] The static Space is live; the playground draws and plays a tune there (H.5).
+- [x] The README links to the Space.
 - [ ] **You** have run H.4 and opened both pages.

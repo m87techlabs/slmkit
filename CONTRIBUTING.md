@@ -139,6 +139,7 @@ uv run slm pretrain abc_music/micro_v1 --set train.lr=6e-4
 uv run slm eval <run_id>
 uv run slm runs list                          # tokens done/target, GPU-hours, last checkpoint
 uv run slm runs list --project abc_music      # only runs for one project
+uv run slm runs list --json                   # the same, as JSON for scripts; accepts --project
 uv run slm runs compare <run_a> <run_b>
 uv run slm export <run_id> --name <model> --version <n>
 uv run slm serve --model <model>:<n>
@@ -192,6 +193,25 @@ part of the current milestone — implement it rather than inventing a different
   choice was not obvious.
 - **No co-author or generated-by trailers.** Commits carry the repository author only.
 - Never commit anything under `$SLM_HOME`; artifacts stay out of git by design.
+
+## Picking up an issue
+
+New here? Issues labelled
+[`good first issue`](https://github.com/m87techlabs/slmkit/labels/good%20first%20issue) each say what
+to change, which files, and when it's done.
+
+1. **Comment on the issue first**, with a short plan, and **wait to be assigned** before opening a pull
+   request. An issue with an assignee is taken. This keeps two people from doing the same work: two pull
+   requests for one issue means one of them gets closed.
+2. Maintainers reply to requests within a few days. If an assigned issue sees no activity for two
+   weeks, ask on it and it can be freed up.
+3. Open the pull request from a branch, with `Closes #N` in its description. The pull-request template's
+   checklist mirrors this file.
+4. **Run `make lint` and `make test` before opening it.** The music grader tests need `abc2midi`
+   (`sudo apt install abcmidi`). CI runs both again; for a first contribution, a maintainer has to
+   approve the CI run, so expect a short wait.
+5. Using an AI assistant is fine. Say so in the pull request, and make sure you understand and have
+   run what you submit; you're answering for it in review.
 
 ## Workflow expectations
 
