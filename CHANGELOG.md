@@ -19,7 +19,9 @@ interfaces; each entry says what moved. Milestones (M0, M1, …) are described i
   `info` says `"engine": "browser"`; project viewers work unchanged (ADR 0011).
 - `slm runs list --project NAME` lists one project's runs (#8, thanks @KeuqS).
 - `abc-folk` on the Hugging Face Hub ([m87techlabs/abc-folk](https://huggingface.co/m87techlabs/abc-folk)),
-  and a runbook for publishing an export there (`docs/runbooks/hf-hub.md`).
+  with a [live demo](https://huggingface.co/spaces/m87techlabs/abc-folk) that runs the model in the
+  browser, and a runbook for publishing an export there (`docs/runbooks/hf-hub.md`).
+- `CONTRIBUTING.md`: how to pick up an issue (comment, get assigned, then open a pull request).
 
 ## [0.1.0] - 2026-10-13
 

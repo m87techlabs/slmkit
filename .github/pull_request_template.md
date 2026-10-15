@@ -2,8 +2,11 @@
 
 <!-- What this changes, and why. Say what you rejected when the choice wasn't obvious. -->
 
+Closes #<!-- the issue number; you should be its assignee (CONTRIBUTING.md, "Picking up an issue") -->
+
 ## Checklist (CONTRIBUTING.md)
 
+- [ ] I was assigned the issue before opening this (or it's a maintainer change)
 - [ ] `make lint` and `make test` pass (CI runs both); `make test-gpu` too if training code changed
 - [ ] The engine (`src/slmkit/`) doesn't reference any project (rule 2); a Project API change has an ADR
 - [ ] Docs in the same change: the concept page and runbook for what was built, with real output

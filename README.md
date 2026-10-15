@@ -7,6 +7,11 @@
 **A framework for building small language models from scratch on a single consumer GPU — and a
 guided way to learn how language models actually work.**
 
+**[Try it in your browser →](https://huggingface.co/spaces/m87techlabs/abc-folk)** A folk-tune model
+trained with slmkit (864K parameters, under a minute of GPU time) writes a tune on request, draws it as
+sheet music and plays it. The model runs in your browser; there is no server
+([how](docs/concepts/browser-inference.md)).
+
 ```
 ingest → prepare → tokenizer → pack → pretrain → SFT → eval → export → serve
 ```
@@ -111,7 +116,7 @@ uv run slm studio start   # "See it in action": everything you built, in your br
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Architecture, contracts, and the rules the code enforces |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Milestones and their exit criteria |
 | [`docs/decisions/`](docs/decisions/) | ADRs — what was decided, and what was rejected |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | The rules every change follows: hard rules, conventions, commits |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | The rules every change follows: hard rules, conventions, commits. **Want to help?** Start with a [`good first issue`](https://github.com/m87techlabs/slmkit/labels/good%20first%20issue), and see "Picking up an issue" there |
 | [`CHANGELOG.md`](CHANGELOG.md) | What changed in each release |
 
 ## Status
