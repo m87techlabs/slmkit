@@ -352,8 +352,11 @@ def _short(n: float) -> str:
 @_friendly_errors
 def runs_list(
     project: str | None = typer.Option(None, "--project", help="Only show runs for this project."),
+    as_json: bool = typer.Option(False, "--json", help="Print the runs as a JSON array."),
 ) -> None:
     """Every run: progress, GPU-hours used and left, best validation loss, last checkpoint."""
+    import json
+
     from slmkit.train.run import list_runs
 
     rows = list_runs()
@@ -364,6 +367,9 @@ def runs_list(
             if isinstance(st.get("experiment"), str)
             and st["experiment"].partition("/")[0] == project
         ]
+    if as_json:
+        typer.echo(json.dumps([{**st, "run_id": path.name} for path, st in rows], indent=2))
+        return
     if not rows:
         message = (
             "no runs yet under $SLM_HOME/runs"

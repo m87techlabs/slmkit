@@ -43,3 +43,24 @@ def test_runs_list_can_filter_by_project(slm_home: Path) -> None:
     assert filtered.exit_code == 0, filtered.output
     assert "abc run" in all_runs.output and "chess run" in all_runs.output
     assert "abc run" in filtered.output and "chess run" not in filtered.output
+
+
+def test_runs_list_json(slm_home: Path) -> None:
+    _write_status(slm_home, "run-abc123456789", "abc_music/micro_v1", "abc run")
+    _write_status(slm_home, "run-chess123456", "chess/nano", "chess run")
+
+    all_runs = CliRunner().invoke(app, ["runs", "list", "--json"])
+    filtered = CliRunner().invoke(app, ["runs", "list", "--json", "--project", "chess"])
+
+    assert all_runs.exit_code == 0, all_runs.output
+    runs = json.loads(all_runs.output)
+    assert {r["run_id"] for r in runs} == {"run-abc123456789", "run-chess123456"}
+    assert runs[0]["tokens_seen"] == 1000
+    assert [r["name"] for r in json.loads(filtered.output)] == ["chess run"]
+
+
+def test_runs_list_json_empty(slm_home: Path) -> None:
+    result = CliRunner().invoke(app, ["runs", "list", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == []
