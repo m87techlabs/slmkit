@@ -15,6 +15,7 @@ interfaces; each entry says what moved. Milestones (M0, M1, …) are described i
   `model.js` is the network written out in JavaScript, with a key/value cache, tested against PyTorch in
   headless Chrome (logits within 1e-4, greedy output token for token). The playground page uses it when
   `info` says `"engine": "browser"`; project viewers work unchanged (ADR 0011).
+- `slm runs list --project NAME` lists one project's runs (#8, thanks @KeuqS).
 - `abc-folk` on the Hugging Face Hub ([m87techlabs/abc-folk](https://huggingface.co/m87techlabs/abc-folk)),
   and a runbook for publishing an export there (`docs/runbooks/hf-hub.md`).
 
