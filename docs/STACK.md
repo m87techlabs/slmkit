@@ -358,7 +358,7 @@ Triton Inference Server, which are built for fleets of GPU models, not one 3.5 M
 
 ### Hugging Face Hub, Spaces and the `hf` CLI
 **◐** (after v0.1.0; not a dependency) · `huggingface_hub 2.2` via `uvx` ·
-[Hub](https://huggingface.co/docs/hub) · [Docker Spaces](https://huggingface.co/docs/hub/spaces-sdks-docker) ·
+[Hub](https://huggingface.co/docs/hub) · [static Spaces](https://huggingface.co/docs/hub/spaces-sdks-static) ·
 [CLI](https://huggingface.co/docs/huggingface_hub/guides/cli)
 
 **What it is.** Hugging Face's hosting for models and demo apps, each a git repository, and the
@@ -366,9 +366,10 @@ command-line client that uploads to it.
 
 **Why.** Publishing an export where anyone can load it with `transformers` or try it in a browser.
 Exports are already HF-format and their cards carry the Hub's metadata (ADR 0010), so publishing is
-`hf upload`. The demo is a *Docker* Space running `slm serve` itself. Run through `uvx`, the CLI
-installs nothing into slmkit. Rejected: a Gradio Space (a second UI, and a framework slmkit doesn't
-use); making `huggingface_hub` a dependency for an occasional, manual step.
+`hf upload`. The demo is a *static* Space holding what `slm site` builds, with the model running in
+the visitor's browser (ADR 0011). Run through `uvx`, the CLI installs nothing into slmkit. Rejected: a
+Docker Space running `slm serve` (it now needs a paid plan); a Gradio Space (a second UI, and a framework
+slmkit doesn't use); making `huggingface_hub` a dependency for an occasional, manual step.
 
 ### HTTPX
 **●** extra `dev` · `0.28` · [docs](https://www.python-httpx.org/)
@@ -399,6 +400,12 @@ zoom and axis ticks are exactly the parts worth not writing).
 **Why.** No Node is installed in WSL, so there's no JavaScript test runner. A real browser rendering each
 studio and playground page is the check that the JavaScript works. The runbooks' screenshots were made
 this way (studio.md §S.6). Nothing is installed; both browsers ship with Windows.
+
+`tests/unit/test_site.py` also uses it (`--dump-dom`) to run `model.js`, the in-browser copy of the
+model, against PyTorch (ADR 0011). It finds `google-chrome` or `chromium` on Linux (CI's Ubuntu runners
+have Chrome) or the Windows browsers from WSL, honours `SLM_CHROME`, and skips if there is none.
+Headless Chrome's virtual time doesn't advance Web Workers, so screenshots of the browser engine
+generating were taken over the DevTools protocol instead, with a throwaway script outside the repo.
 
 ### Docker and Kubernetes
 **◐ M4** (optional) · [Docker](https://docs.docker.com/) · [Kubernetes](https://kubernetes.io/docs/) ·

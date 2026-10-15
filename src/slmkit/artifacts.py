@@ -32,7 +32,8 @@ from slmkit.config.load import repo_root, stable_hash
 MANIFEST = "manifest.json"
 
 # Short prefixes make IDs self-describing in logs: `pk-3f9a1c...` is obviously packed data.
-PREFIX = {"raw": "raw", "dataset": "ds", "tokenizer": "tk", "packed": "pk", "run": "run"}
+PREFIX = {"raw": "raw", "dataset": "ds", "tokenizer": "tk", "packed": "pk", "run": "run",
+          "site": "site"}  # fmt: skip
 _ID_HEX = 12  # 48 bits: collisions are not a practical concern at this scale
 
 

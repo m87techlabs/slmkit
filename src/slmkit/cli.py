@@ -607,6 +607,18 @@ def models_list() -> None:
 
 @app.command()
 @_friendly_errors
+def site(
+    model: str = typer.Argument(..., help="An exported model, <name>:<version>."),
+) -> None:
+    """Build a static web site where the model runs in the visitor's browser (no server)."""
+    from slmkit.serve.site import build_site
+
+    path = build_site(model, log=typer.echo)
+    typer.echo(f"try it: python3 -m http.server -d {path} 8000   then open http://localhost:8000/")
+
+
+@app.command()
+@_friendly_errors
 def serve(
     model: str = typer.Option(..., "--model", help="An exported model, <name>:<version>."),
     host: str = typer.Option("127.0.0.1", help="Bind address. Keep it local; see DESIGN 6.9."),

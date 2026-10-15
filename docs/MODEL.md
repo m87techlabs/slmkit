@@ -5,6 +5,10 @@ presets, and the files a trained model ends up as. It is the specification the c
 `src/slmkit/model/` implements (M1 Phase B). For terms, see [`GLOSSARY.md`](GLOSSARY.md); for the
 walk-through of the actual code, `concepts/the-model.md` (lands with Phase B).*
 
+*A second implementation exists: `src/slmkit/serve/static/model.js` runs the same network in a browser
+(`slm site`, ADR 0011). A change to the architecture here has to be made there too;
+`tests/unit/test_site.py` fails if the two disagree.*
+
 ---
 
 ## At a glance

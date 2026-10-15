@@ -24,7 +24,8 @@ must match exactly and which are only ballpark figures.
 | [`m0-environment.md`](m0-environment.md) | M0 | ☑ |
 | [`m1-engine.md`](m1-engine.md) | M1 | ☑ |
 | [`m2-abc-music.md`](m2-abc-music.md) | M2 | ☑ |
-| [`studio.md`](studio.md) | Studio | ◐ Phase 1 |
+| [`studio.md`](studio.md) | Studio | ◐ phases 1–3 done; last criterion proved by M3 |
+| [`hf-hub.md`](hf-hub.md) | Publishing on the Hugging Face Hub, and `slm site` | ◐ model live; static Space next |
 
 **In `slm studio`.** The studio lists each project's runbooks next to its runs. A runbook that belongs
 to one project says so near its top with `<!-- slm-studio: projects=abc_music -->` (a comma-separated

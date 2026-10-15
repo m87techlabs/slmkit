@@ -563,6 +563,9 @@ one allowed exception is `export --to-windows`.
   first project that has one (chess, M3).
 - `/` is a browser playground (one static page). A project may ship a viewer (`web_viewer()`,
   ADR 0008) that the export carries as `ui/`: for ABC, sheet music and in-browser playback.
+- `slm site abc-folk:3` builds a static site where the model runs in the browser: the same
+  playground page, `serve/static/model.js` (the network in JavaScript, parity-tested against PyTorch in
+  headless Chrome) and the model's files. No server at all; any static host serves it (ADR 0011).
 - For anything worth keeping online, put an existing gateway in front rather than exposing
   `slm serve` directly — it handles auth, rate limiting and TLS, which this app deliberately
   does not.

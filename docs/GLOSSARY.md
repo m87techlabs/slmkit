@@ -438,8 +438,16 @@ hub. "HF format" is the de-facto standard model layout, which is why slmkit expo
 repository. A model's page is its `README.md`, and a YAML block at the top gives its licence, task and
 tags. The registry analogy: a container registry for model files.
 
-**Space.** A demo app hosted on the Hub, built from its own git repository. A *Docker* Space builds the
-repository's Dockerfile and sends visitors to one port; slmkit's runs `slm serve` (ADR 0010).
+**Space.** A demo app hosted on the Hub, from its own git repository. A *static* Space serves the
+repository's files as a web site, free; a *Docker* Space builds a Dockerfile and runs it as a server
+(now a paid plan). slmkit's demo is a static Space built by `slm site`, with the model running in the
+visitor's browser (ADR 0011).
+
+**Web Worker.** A background thread for a web page. The page and the worker exchange messages, so long
+work (here, generating text with `model.js`) doesn't freeze the page.
+
+**Static site.** A web site that is only files (HTML, JavaScript, data), served as they are, with no
+program running on the server. `slm site` builds one per model.
 
 **safetensors.** A tensor file format that is safe to load from untrusted sources, unlike
 Python's `pickle`.
