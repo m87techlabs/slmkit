@@ -350,13 +350,27 @@ def _short(n: float) -> str:
 
 @runs_app.command("list")
 @_friendly_errors
-def runs_list() -> None:
+def runs_list(
+    project: str | None = typer.Option(None, "--project", help="Only show runs for this project."),
+) -> None:
     """Every run: progress, GPU-hours used and left, best validation loss, last checkpoint."""
     from slmkit.train.run import list_runs
 
     rows = list_runs()
+    if project is not None:
+        rows = [
+            (path, st)
+            for path, st in rows
+            if isinstance(st.get("experiment"), str)
+            and st["experiment"].partition("/")[0] == project
+        ]
     if not rows:
-        typer.echo("no runs yet under $SLM_HOME/runs")
+        message = (
+            "no runs yet under $SLM_HOME/runs"
+            if project is None
+            else f"no runs found for project {project}"
+        )
+        typer.echo(message)
         return
     header = (f"{'RUN':<17} {'NAME':<18} {'TOKENS':<16} {'DONE':>6} {'GPU-h':>6} {'LEFT':>6} "
               f"{'BEST VAL':>8}  {'LAST CHECKPOINT':<22} STATUS")  # fmt: skip

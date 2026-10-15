@@ -138,6 +138,7 @@ uv run slm run abc_music/micro_v1            # full pipeline; skips existing art
 uv run slm pretrain abc_music/micro_v1 --set train.lr=6e-4
 uv run slm eval <run_id>
 uv run slm runs list                          # tokens done/target, GPU-hours, last checkpoint
+uv run slm runs list --project abc_music      # only runs for one project
 uv run slm runs compare <run_a> <run_b>
 uv run slm export <run_id> --name <model> --version <n>
 uv run slm serve --model <model>:<n>
