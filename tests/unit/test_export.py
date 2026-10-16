@@ -126,6 +126,79 @@ def test_export_cli_and_models_list(toy_run: str) -> None:
     assert listed.exit_code == 0 and "toy-model:1" in listed.output
 
 
+def test_models_list_filters_by_project(toy_run: str) -> None:
+    """Filter manifest ownership, not the export name, without hiding unfiltered models."""
+    export_run(toy_run, "first-model", 1, **QUIET)
+    other = export_run(toy_run, "second-model", 1, **QUIET)
+    manifest_path = other / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["project"] = "other"
+    manifest_path.write_text(json.dumps(manifest))
+    runner = CliRunner()
+
+    for project, included, excluded in (
+        ("toy", "first-model:1", "second-model:1"),
+        ("other", "second-model:1", "first-model:1"),
+    ):
+        result = runner.invoke(app, ["models", "list", "--project", project])
+        assert result.exit_code == 0, result.output
+        assert included in result.output and excluded not in result.output
+
+    missing = runner.invoke(app, ["models", "list", "--project", "to"])
+    assert missing.exit_code == 0
+    assert missing.output == "no models found for project to\n"
+
+    unfiltered = runner.invoke(app, ["models", "list"])
+    assert unfiltered.exit_code == 0
+    assert "first-model:1" in unfiltered.output and "second-model:1" in unfiltered.output
+
+
+@pytest.mark.parametrize("project", [None, "missing"])
+def test_models_list_empty(slm_home: Path, project: str | None) -> None:
+    """Distinguish an empty store from a project with no matches."""
+    args = ["models", "list"] + ([] if project is None else ["--project", project])
+    result = CliRunner().invoke(app, args)
+    assert result.exit_code == 0
+    expected = (
+        "no exported models yet under $SLM_HOME/models"
+        if project is None
+        else f"no models found for project {project}"
+    )
+    assert result.output == expected + "\n"
+
+
+def test_models_list_reads_manifest_projects(slm_home: Path) -> None:
+    """List stored manifests, including legacy exports without project ownership."""
+    for name, owner in (("first", "one"), ("second", "two"), ("legacy", None)):
+        path = slm_home / "models" / name / "1"
+        path.mkdir(parents=True)
+        manifest = {
+            "id": f"{name}:1",
+            "stats": {"stage": "pretrain", "params": 100, "step": 10},
+            "inputs": {"run": "test-run"},
+            "created": "2026-01-01T00:00:00+00:00",
+        }
+        if owner is not None:
+            manifest["project"] = owner
+        (path / "manifest.json").write_text(json.dumps(manifest))
+
+    runner = CliRunner()
+    for owner, included, excluded in (
+        ("one", "first:1", "second:1"),
+        ("two", "second:1", "first:1"),
+    ):
+        result = runner.invoke(app, ["models", "list", "--project", owner])
+        assert result.exit_code == 0, result.output
+        assert included in result.output and excluded not in result.output
+        assert "legacy:1" not in result.output
+
+    missing = runner.invoke(app, ["models", "list", "--project", "on"])
+    assert missing.exit_code == 0 and missing.output == "no models found for project on\n"
+    unfiltered = runner.invoke(app, ["models", "list"])
+    assert unfiltered.exit_code == 0
+    assert all(ref in unfiltered.output for ref in ("first:1", "second:1", "legacy:1"))
+
+
 def test_a_project_viewer_is_copied_into_the_export(
     toy_run: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, slm_home: Path
 ) -> None:

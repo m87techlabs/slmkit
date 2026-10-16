@@ -142,6 +142,8 @@ uv run slm runs list --project abc_music      # only runs for one project
 uv run slm runs list --json                   # the same, as JSON for scripts; accepts --project
 uv run slm runs compare <run_a> <run_b>
 uv run slm export <run_id> --name <model> --version <n>
+uv run slm models list                        # every exported model
+uv run slm models list --project abc_music    # only exports for one project
 uv run slm serve --model <model>:<n>
 uv run slm site <model>:<n>                   # static site; the model runs in the browser
 uv run slm studio start | stop | status | run  # "See it in action": the local web studio
