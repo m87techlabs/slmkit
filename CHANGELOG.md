@@ -8,6 +8,7 @@ interfaces; each entry says what moved. Milestones (M0, M1, …) are described i
 ## [Unreleased]
 
 ### Added
+- `slm models list --project NAME` lists only exports whose manifest belongs to that project (#11).
 - `slm runs list --json` prints the runs as a JSON array (run ID plus the fields of `status.json`) for
   scripts and notebooks. Works with `--project`.
 - Model cards open with Hugging Face Hub metadata (licence, library, task, tags), so an export can be

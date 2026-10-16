@@ -592,13 +592,24 @@ def export(
 
 
 @models_app.command("list")
-def models_list() -> None:
+def models_list(
+    project: str | None = typer.Option(
+        None, "--project", help="Only show models for this project."
+    ),
+) -> None:
     """Every exported model: source run, stage, size and parity result."""
     from slmkit.export.hf import list_exports
 
     rows = list_exports()
+    if project is not None:
+        rows = [m for m in rows if m.get("project") == project]
     if not rows:
-        typer.echo("no exported models yet under $SLM_HOME/models")
+        message = (
+            "no exported models yet under $SLM_HOME/models"
+            if project is None
+            else f"no models found for project {project}"
+        )
+        typer.echo(message)
         return
     typer.echo(f"{'MODEL':<20} {'STAGE':<9} {'PARAMS':>9} {'RUN':<17} {'STEP':>6} "
                f"{'HF PARITY':>10}  CREATED")  # fmt: skip
